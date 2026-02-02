@@ -5,7 +5,7 @@ import queue
 import asyncio
 import traceback
 from flask import Flask, request, jsonify
-from pyngrok import ngrok
+from pycloudflared import try_cloudflare
 from dotenv import load_dotenv
 import videodb
 from videodb._constants import RTStreamChannelType
@@ -26,7 +26,6 @@ PORT = 5002
 if not VIDEO_DB_API_KEY:
     raise ValueError("VIDEO_DB_API_KEY environment variable not set")
 
-# Global variables
 conn = None
 public_url = None
 
@@ -36,11 +35,17 @@ def init_app():
     print(f"🔌 Connecting to VideoDB at {BASE_URL}...")
     conn = videodb.connect(api_key=VIDEO_DB_API_KEY, base_url=BASE_URL)
 
-    # Start ngrok
-    print(f"🚇 Starting ngrok tunnel on port {PORT}...")
-    tunnel = ngrok.connect(PORT)
-    public_url = tunnel.public_url.replace("http://", "https://")
-    print(f"✅ Ngrok Tunnel Started: {public_url}")
+    # Start Cloudflare Tunnel
+    print(f"🚇 Starting Cloudflare Tunnel on port {PORT}...")
+    tunnel = try_cloudflare(port=PORT)
+    public_url = tunnel.tunnel
+    print(f"✅ Cloudflare Tunnel Started: {public_url}")
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    """Health check endpoint."""
+    return jsonify({"status": "ok", "tunnel": public_url})
 
 
 @app.route("/init-session", methods=["POST"])
@@ -80,7 +85,7 @@ def start_ws_listener(result_queue, name="Listener"):
                 ws_wrapper = conn.connect_websocket()
                 ws = await ws_wrapper.connect()
                 ws_id = ws.connection_id
-                print(f"[{name}] Connected! ID: {ws_id}")
+                print(f"[{name}] ✅ Connected! ID: {ws_id}")
 
                 # Send ID back to main thread
                 result_queue.put(ws_id)
@@ -89,14 +94,23 @@ def start_ws_listener(result_queue, name="Listener"):
                 async for msg in ws.receive():
                     channel = msg.get("channel")
                     data = msg.get("data", {})
-                    
+
                     if channel == "transcript":
-                         print(f"[{name}] 📝 Transcript: {data.get('text')}")
-                    elif channel in ["audio_index", "scene_index"]:
-                         print(f"[{name}] 🧠 {channel}: {data.get('text')}")
-                    
+                        text = data.get("text", "")
+                        if text.strip():
+                            print(f"\n[{name}] 📝 Transcript: {text}")
+                    elif channel == "audio_index":
+                        text = data.get("text", "")
+                        if text.strip():
+                            print(f"\n[{name}] 🧠 Audio Index: {text}")
+                    elif channel in ["scene_index", "visual_index"]:
+                        text = data.get("text", "")
+                        if text.strip():
+                            print(f"\n[{name}] 👁️ Visual Index: {text}")
+
             except Exception as e:
-                print(f"[{name}] Error: {e}")
+                print(f"[{name}] ❌ Error: {e}")
+                traceback.print_exc()
 
         # Each thread needs its own loop
         loop = asyncio.new_event_loop()
@@ -113,12 +127,24 @@ def callback():
     """Receives and logs callbacks."""
     data = request.json
     event = data.get("event")
-    
-    # Filter for cleaner logs
-    if event not in ["capture_session.active", "capture_session.exported"]:
-         return jsonify({"received": True})
 
+    # Handle None or missing event
+    if event is None:
+        print("\n🔔 [WEBHOOK] Received webhook with no event field")
+        print(f"   Full payload: {data}")
+        return jsonify({"received": True})
+
+    # Log ALL events for debugging
     print(f"\n🔔 [WEBHOOK] Event: {event}")
+
+    # Filter for AI pipeline processing and cleanup tracking
+    if event not in [
+        "capture_session.active",
+        "capture_session.stopping",
+        "capture_session.stopped",
+        "capture_session.exported",
+    ]:
+        return jsonify({"received": True})
 
     if event == "capture_session.active":
         print("⚡️ Capture Session Active! Starting AI pipelines...")
@@ -127,52 +153,66 @@ def callback():
         try:
             # 1. Get the session
             cap = conn.get_capture_session(cap_id)
+            print(f"📄 Retrieved Session: {cap.id}")
 
             # 2. Get streams by category
             mics = cap.get_rtstream(RTStreamChannelType.mic)
             displays = cap.get_rtstream(RTStreamChannelType.screen)
+            system_audios = cap.get_rtstream(RTStreamChannelType.system_audio)
 
-            print(f"   Streams found: Mics={len(mics)} | Displays={len(displays)}")
+            print(
+                f"   🎤 Mics: {len(mics)} | 🔊 System Audio: {len(system_audios)} | 📺 Displays: {len(displays)}"
+            )
 
-            # 3. Start AI on Mics
-            if mics:
-                mic = mics[0]
-                
+            # 3. Start AI on System Audio (Prioritized over Mic for quickstart)
+            if system_audios:
+                sys_audio = system_audios[0]
+                print(f"   🔊 Indexing system audio: {sys_audio.id}")
+
                 # Start a WS listener for this stream
                 q = queue.Queue()
                 start_ws_listener(q, name="AudioWatcher")
                 ws_id = q.get(timeout=10)
-                
-                print(f"   🎤 Starting transcription on {mic.name}...")
-                mic.start_transcript(ws_connection_id=ws_id)
-                mic.index_audio(
-                    prompt="Extract action items",
+
+                sys_audio.start_transcript(ws_connection_id=ws_id)
+                sys_audio.index_audio(
+                    prompt="Extract key decisions and action items",
                     ws_connection_id=ws_id,
                 )
+                print(f"   ✅ System Audio indexing started (socket: {ws_id})")
 
             # 4. Start AI on Displays
             if displays:
                 display = displays[0]
-                
+                print(f"   📺 Indexing display: {display.id}")
+
                 # Start a WS listener for this stream
                 q = queue.Queue()
                 start_ws_listener(q, name="VisualWatcher")
                 ws_id = q.get(timeout=10)
-                
-                print(f"   📺 Starting visual indexing on {display.name}...")
+
                 display.index_visuals(
-                    prompt="Describe scene changes",
+                    prompt="Describe what the user is doing on screen",
                     ws_connection_id=ws_id,
                 )
+                print(f"   ✅ Visual indexing started (socket: {ws_id})")
 
         except Exception as e:
             print(f"❌ Error in callback processing: {e}")
             traceback.print_exc()
-            
+
+    elif event == "capture_session.stopping":
+        print("⏸️  Session stopping... (client initiated shutdown)")
+
+    elif event == "capture_session.stopped":
+        print("🛑 Session stopped successfully!")
+        print("   All streams have been finalized.")
+
     elif event == "capture_session.exported":
         video_id = data.get("data", {}).get("exported_video_id")
         print(f"✅ Recording Exported! Video ID: {video_id}")
-        
+        print(f"   View at: https://console.videodb.io/player?video={video_id}")
+
     return jsonify({"received": True})
 
 

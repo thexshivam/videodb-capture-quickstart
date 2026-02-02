@@ -1,5 +1,6 @@
-videodb[capture]
+videodb-capture-bin @ git+https://github.com/video-db/videodb-python.git@release-0-4-0#subdirectory=capture_bin
+videodb[capture] @ git+https://github.com/video-db/videodb-python.git@release-0-4-0
 flask
-pyngrok
+pycloudflared
 python-dotenv
 requests
