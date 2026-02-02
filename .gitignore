@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+# Build Output
+dist
+out
+release
+# build (Removed to allow apps/electron-quickstart/build source files)
+.env
+.env.local
+coverage
+.vscode
+*.log
+videodb-recorder
