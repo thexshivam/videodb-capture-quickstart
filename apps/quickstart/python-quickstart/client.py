@@ -33,7 +33,7 @@ async def run_capture(token, session_id):
     print("\n🎥 --- Starting Capture Client ---")
 
     # Initialize Client
-    client = CaptureClient(upload_token=token)
+    client = CaptureClient(client_token=token)
 
     # Stop event for graceful shutdown
     stop_event = asyncio.Event()
