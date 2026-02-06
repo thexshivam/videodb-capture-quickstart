@@ -22,3 +22,4 @@ runtime.json
 users.db
 server/venv/
 __pycache__/
+auth_config.json
