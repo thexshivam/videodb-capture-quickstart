@@ -4,8 +4,12 @@
   "description": "A sample Electron application for screen and camera recording using VideoDB Capture SDK",
   "main": "frontend/main.js",
   "scripts": {
-    "setup": "./scripts/setup.sh",
-    "start": "./scripts/start-server.sh",
+    "setup": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\setup.bat':'./scripts/setup.sh',{stdio:'inherit'})\"",
+    "start": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\start-server.bat':'./scripts/start-server.sh',{stdio:'inherit'})\"",
+    "setup:win": "scripts\\setup.bat",
+    "setup:unix": "./scripts/setup.sh",
+    "start:win": "scripts\\start-server.bat",
+    "start:unix": "./scripts/start-server.sh",
     "electron": "electron .",
     "dist": "electron-builder",
     "pack": "electron-builder --dir"

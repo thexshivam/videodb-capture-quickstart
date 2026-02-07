@@ -15,7 +15,6 @@ contextBridge.exposeInMainWorld('recorderAPI', {
     // Electron specific permission checks logic (optional fallback)
     checkMicPermission: () => ipcRenderer.invoke('check-mic-permission'),
     checkScreenPermission: () => ipcRenderer.invoke('check-screen-permission'),
-    checkAccessibilityPermission: () => ipcRenderer.invoke('check-accessibility-permission'),
     checkCameraPermission: () => ipcRenderer.invoke('check-camera-permission'),
     requestMicPermission: () => ipcRenderer.invoke('request-mic-permission'),
     requestCameraPermission: () => ipcRenderer.invoke('request-camera-permission'),

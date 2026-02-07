@@ -464,8 +464,7 @@ ipcMain.handle('recorder-request-permission', async (event, type) => {
     const permissionMap = {
       'microphone': 'microphone',
       'screen': 'screen-capture',
-      'screen-capture': 'screen-capture',
-      'accessibility': 'accessibility'
+      'screen-capture': 'screen-capture'
     };
 
     const sdkPermission = permissionMap[type] || type;
@@ -493,10 +492,6 @@ ipcMain.handle('recorder-request-permission', async (event, type) => {
     console.error('Error requesting permission:', error);
     return { success: false, error: error.message };
   }
-});
-
-ipcMain.handle('check-accessibility-permission', () => {
-  return systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied';
 });
 
 // Keep existing permission handlers for Electron APIs
@@ -546,8 +541,6 @@ ipcMain.handle('open-system-settings', async (event, type) => {
       url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
     } else if (type === 'screen') {
       url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
-    } else if (type === 'accessibility') {
-      url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
     } else if (type === 'camera') {
       url = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Camera';
     }

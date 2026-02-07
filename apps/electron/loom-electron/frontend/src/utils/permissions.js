@@ -16,11 +16,6 @@ export const permissionUtil = {
                 const status = await window.recorderAPI.checkMicPermission();
                 return { granted: status === 'granted', status };
             }
-
-            if (type === 'accessibility') {
-                const status = await window.recorderAPI.checkAccessibilityPermission();
-                return { granted: status === 'granted', status };
-            }
         } catch (error) {
             console.error(`Permission check error for ${type}:`, error);
             return { granted: false, status: 'error', message: error.message };
@@ -41,11 +36,6 @@ export const permissionUtil = {
             if (type === 'mic') {
                 const result = await window.recorderAPI.requestMicPermission();
                 return result;
-            }
-
-            if (type === 'accessibility') {
-                await window.recorderAPI.openSystemSettings('accessibility');
-                return await this.check(type);
             }
         } catch (error) {
             console.error(`Permission request error for ${type}:`, error);

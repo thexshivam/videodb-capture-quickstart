@@ -4,7 +4,6 @@ export async function initPermissionsFlow() {
     const modal = document.getElementById('permissionModal');
     const btnMic = document.getElementById('btn-grant-mic');
     const btnScreen = document.getElementById('btn-grant-screen');
-    const btnAccessibility = document.getElementById('btn-grant-accessibility');
     const errorMsg = document.getElementById('permissionError');
 
     // Return a promise that resolves only when all permissions are granted
@@ -14,13 +13,11 @@ export async function initPermissionsFlow() {
         const updateUI = async () => {
             const micStatus = await permissionUtil.check('mic');
             const screenStatus = await permissionUtil.check('screen');
-            const accessibilityStatus = await permissionUtil.check('accessibility');
 
             updateItemUI(btnMic, micStatus.granted);
             updateItemUI(btnScreen, screenStatus.granted);
-            updateItemUI(btnAccessibility, accessibilityStatus.granted);
 
-            const allGranted = micStatus.granted && screenStatus.granted && accessibilityStatus.granted;
+            const allGranted = micStatus.granted && screenStatus.granted;
 
             if (allGranted) {
                 modal.classList.remove('visible');
@@ -111,41 +108,6 @@ export async function initPermissionsFlow() {
             } catch (e) {
                 btnScreen.disabled = false;
                 btnScreen.textContent = 'Open Settings';
-                errorMsg.textContent = 'Error: ' + e.message;
-            }
-        });
-
-        btnAccessibility.addEventListener('click', async () => {
-            if (btnAccessibility.textContent === 'Open Settings') {
-                const result = await window.recorderAPI.openSystemSettings('accessibility');
-                if (!result || !result.success) {
-                    errorMsg.textContent = 'Go to System Settings -> Privacy & Security -> Accessibility to enable access.';
-                }
-                return;
-            }
-
-            try {
-                btnAccessibility.disabled = true;
-                btnAccessibility.textContent = 'Requesting...';
-                errorMsg.textContent = '';
-
-                await permissionUtil.request('accessibility');
-                const done = await updateUI();
-
-                if (!done) {
-                    btnAccessibility.disabled = false;
-                    btnAccessibility.textContent = 'Open Settings';
-                    btnAccessibility.classList.remove('granted');
-
-                    errorMsg.textContent = 'Opening System Settings...';
-                    const result = await window.recorderAPI.openSystemSettings('accessibility');
-                    if (!result || !result.success) {
-                        errorMsg.textContent = 'Go to System Settings -> Privacy & Security -> Accessibility to enable access.';
-                    }
-                }
-            } catch (e) {
-                btnAccessibility.disabled = false;
-                btnAccessibility.textContent = 'Open Settings';
                 errorMsg.textContent = 'Error: ' + e.message;
             }
         });
