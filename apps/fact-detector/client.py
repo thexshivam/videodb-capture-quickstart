@@ -1,10 +1,3 @@
-"""Fact Detector Capture Client.
-
-Connects to the backend, starts a VideoDB Capture session, and streams
-system audio for real-time fact-checking. Reuses the capture pattern
-from python-quickstart.
-"""
-
 import asyncio
 import logging
 import requests

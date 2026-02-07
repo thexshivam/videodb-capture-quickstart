@@ -1,9 +1,3 @@
-"""Gemini-based fact-checking engine.
-
-Accepts transcript text, sends it to Gemini for claim extraction
-and verification, and returns structured results.
-"""
-
 import json
 import logging
 

@@ -2,7 +2,7 @@
 
 Real-time fact-checking agent that captures system audio, transcribes it live, and verifies factual claims using Gemini AI.
 
-Works with any audio playing on your Mac: YouTube videos, local media, Google Meet calls, podcasts, webinars, etc.
+Works with any audio playing on your system: YouTube videos, local media, Google Meet calls, podcasts, webinars, etc.
 
 ## Why It Matters
 
@@ -54,12 +54,11 @@ Misinformation spreads fast. Whether you're watching a news clip, sitting in a m
 
 ### Prerequisites
 
-- macOS (tested on MacBook Air M2)
 - Python 3.10+
 - [VideoDB API key](https://console.videodb.io)
 - [Gemini API key](https://aistudio.google.com/apikey)
 
-### Capture Binary
+### Capture Binary ( for Mac)
 
 The VideoDB capture binary (`recorder`) must be available. If you have a custom binary distribution (e.g., `amd_mx/`), create a shim package so the SDK can find it:
 
@@ -132,7 +131,7 @@ source venv/bin/activate
 python client.py
 ```
 
-The client will request microphone and screen capture permissions (macOS will prompt you). Once capture starts, play any video or join a meeting.
+The client will request microphone and screen capture permissions. Once capture starts, play any video or join a meeting.
 
 ### Stop
 
@@ -196,7 +195,7 @@ These can be set as environment variables or adjusted in `backend.py`:
 
 ## Built With
 
-- [VideoDB Capture](https://videodb.io) - System audio capture and real-time transcription
-- [Gemini AI](https://ai.google.dev) (`google-genai` SDK) - Claim extraction and fact verification
+- [VideoDB Capture](https://github.com/video-db/videodb-capture-quickstart) - System audio capture and real-time transcription
+- [Gemini AI](https://ai.google.dev/gemini-api/docs/libraries) (`google-genai` SDK) - Claim extraction and fact verification
 - [Flask](https://flask.palletsprojects.com) - Backend server
 - [pycloudflared](https://github.com/6abd/pycloudflared) - Webhook tunneling

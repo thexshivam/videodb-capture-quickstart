@@ -1,12 +1,3 @@
-"""Fact Detector Backend.
-
-Flask server that orchestrates:
-1. VideoDB Capture session management
-2. Real-time transcript ingestion via WebSocket
-3. Periodic fact-checking via Gemini
-4. Terminal display and file logging of results
-"""
-
 import os
 import sys
 import logging
@@ -26,10 +17,7 @@ from videodb._constants import RTStreamChannelType
 
 from fact_checker import FactChecker
 
-# ---------------------------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------------------------
-
 load_dotenv()
 
 VIDEO_DB_API_KEY = os.getenv("VIDEO_DB_API_KEY")
@@ -52,10 +40,7 @@ if not GEMINI_API_KEY:
     print("[ERROR] GEMINI_API_KEY environment variable not set")
     sys.exit(1)
 
-# ---------------------------------------------------------------------------
 # Logging
-# ---------------------------------------------------------------------------
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -67,16 +52,10 @@ log_filename = os.path.join(
     LOG_DIR, f"fact_check_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
 )
 
-# ---------------------------------------------------------------------------
 # Flask App
-# ---------------------------------------------------------------------------
-
 app = Flask(__name__)
 
-# ---------------------------------------------------------------------------
 # Shared State
-# ---------------------------------------------------------------------------
-
 conn = None
 public_url = None
 checker = None
@@ -96,10 +75,7 @@ session_stats = {
 stats_lock = threading.Lock()
 
 
-# ---------------------------------------------------------------------------
 # File Logging
-# ---------------------------------------------------------------------------
-
 def log_to_file(entry):
     """Append a JSON-lines entry to the log file."""
     try:
@@ -126,10 +102,7 @@ def log_claims(claims, transcript_chunk):
     log_to_file(entry)
 
 
-# ---------------------------------------------------------------------------
 # Terminal Display
-# ---------------------------------------------------------------------------
-
 VERDICT_LABELS = {
     "TRUE": "[FACT CHECK -- TRUE]",
     "FALSE": "[FACT CHECK !! FALSE]",
@@ -178,10 +151,7 @@ def display_claims(claims):
     sys.stdout.flush()
 
 
-# ---------------------------------------------------------------------------
 # Fact-Check Runner (background thread)
-# ---------------------------------------------------------------------------
-
 def run_fact_check_loop():
     """Periodically drain the transcript buffer and fact-check its contents."""
     logger.info(
@@ -218,10 +188,7 @@ def run_fact_check_loop():
         log_claims(claims, chunk)
 
 
-# ---------------------------------------------------------------------------
 # WebSocket Listener
-# ---------------------------------------------------------------------------
-
 def start_ws_listener(result_queue, name="FactDetectorWS"):
     """Start a background thread that listens for real-time transcript events."""
 
@@ -265,10 +232,7 @@ def start_ws_listener(result_queue, name="FactDetectorWS"):
     return t
 
 
-# ---------------------------------------------------------------------------
 # Flask Routes
-# ---------------------------------------------------------------------------
-
 @app.route("/health", methods=["GET"])
 def health():
     """Health check endpoint."""
@@ -412,10 +376,7 @@ def callback():
     return jsonify({"received": True})
 
 
-# ---------------------------------------------------------------------------
 # Initialization
-# ---------------------------------------------------------------------------
-
 def init_app():
     """Initialize VideoDB connection, Gemini checker, tunnel, and background tasks."""
     global conn, public_url, checker
