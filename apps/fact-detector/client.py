@@ -1,15 +1,78 @@
 import asyncio
 import logging
+import os
 import requests
 import signal
+import subprocess
 import sys
+import time
+import webbrowser
 
 from videodb.capture import CaptureClient
 
 BACKEND_URL = "http://localhost:5002"
+OPEN_DELAY_SECONDS = 3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("fact-detector-client")
+
+
+def validate_youtube_url(url):
+    """Check if the URL looks like a YouTube link."""
+    return "youtube.com" in url or "youtu.be" in url
+
+
+def validate_meet_url(url):
+    """Check if the URL looks like a Google Meet link."""
+    return "meet.google.com" in url
+
+
+def validate_local_file(path):
+    """Check if the local file path exists."""
+    return os.path.exists(path)
+
+
+def open_content(source_type, target):
+    """Open the selected content source and wait for it to load."""
+    if source_type in ("youtube", "meet"):
+        print(f"[OPEN] Opening {target} in your browser...")
+        webbrowser.open(target)
+    elif source_type == "local":
+        print(f"[OPEN] Opening {target} with default player...")
+        subprocess.run(["open", target])
+    print(f"[OPEN] Waiting {OPEN_DELAY_SECONDS}s for content to load...")
+    time.sleep(OPEN_DELAY_SECONDS)
+
+
+def show_menu():
+    """Display an interactive menu to choose the audio source."""
+    print("\nWhat do you want to fact-check?\n")
+    print("  1. YouTube video")
+    print("  2. Google Meet call")
+    print("  3. Local video file")
+    print()
+
+    options = {
+        "1": ("youtube", "Enter YouTube URL: ", validate_youtube_url, "Invalid YouTube URL. Must contain youtube.com or youtu.be."),
+        "2": ("meet", "Enter Google Meet URL: ", validate_meet_url, "Invalid Meet URL. Must contain meet.google.com."),
+        "3": ("local", "Enter path to video file: ", validate_local_file, "File not found. Please check the path and try again."),
+    }
+
+    while True:
+        choice = input("Enter choice (1/2/3): ").strip()
+        if choice in options:
+            break
+        print("Invalid choice. Please enter 1, 2, or 3.\n")
+
+    source_type, prompt, validator, error_msg = options[choice]
+
+    while True:
+        target = input(prompt).strip()
+        if validator(target):
+            break
+        print(f"{error_msg}\n")
+
+    open_content(source_type, target)
 
 
 async def init_session():
@@ -131,6 +194,8 @@ async def main():
     print("=" * 60)
     print("  FACT DETECTOR - Capture Client")
     print("=" * 60)
+
+    show_menu()
 
     session_data = await init_session()
     token = session_data["token"]
