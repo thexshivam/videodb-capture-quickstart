@@ -75,7 +75,7 @@ def show_menu():
     open_content(source_type, target)
 
 
-async def init_session():
+def init_session():
     """Request the backend to create a capture session."""
     try:
         print(f"[INIT] Connecting to backend at {BACKEND_URL}...")
@@ -197,7 +197,7 @@ async def main():
 
     show_menu()
 
-    session_data = await init_session()
+    session_data = init_session()
     token = session_data["token"]
     session_id = session_data["session_id"]
 

@@ -1,4 +1,20 @@
-logs/
+# Environment variables (may contain API keys)
+.env
+.env.local
+.env.*.local
 
 # Override root .gitignore to include .env.example
 !.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Logs
+logs/
+
+# macOS
+.DS_Store

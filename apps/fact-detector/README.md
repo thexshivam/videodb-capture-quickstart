@@ -38,7 +38,7 @@ Misinformation spreads fast. Whether you're watching a news clip, sitting in a m
                                                     v                  v
                                             +-----------+    +----------------+
                                             | Terminal   |    | Log File       |
-                                            | Alerts     |    | (JSONL)        |
+                                            | Alerts     |    | (JSON)         |
                                             +-----------+    +----------------+
 ```
 
@@ -190,14 +190,14 @@ Press `Ctrl+C` in the client terminal. The backend will flush remaining transcri
 
 ## Log Files
 
-Structured logs are written to the `logs/` directory as JSONL files (one JSON object per line). Each entry contains:
+Each fact-check cycle writes a separate JSON file to the `logs/` directory. Each file contains:
 
 - Timestamp
 - Transcript chunk analyzed
 - List of claims with verdicts
 - Summary counts
 
-The final entry is a session summary with aggregate statistics.
+A final session summary file with aggregate statistics is written when the session stops.
 
 ## Configuration
 

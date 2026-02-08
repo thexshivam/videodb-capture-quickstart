@@ -40,6 +40,7 @@ if not GEMINI_API_KEY:
     print("[ERROR] GEMINI_API_KEY environment variable not set")
     sys.exit(1)
 
+
 # Logging
 logging.basicConfig(
     level=logging.INFO,
@@ -48,9 +49,6 @@ logging.basicConfig(
 logger = logging.getLogger("fact-detector")
 
 os.makedirs(LOG_DIR, exist_ok=True)
-log_filename = os.path.join(
-    LOG_DIR, f"fact_check_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
-)
 
 # Flask App
 app = Flask(__name__)
@@ -77,10 +75,13 @@ stats_lock = threading.Lock()
 
 # File Logging
 def log_to_file(entry):
-    """Append a JSON-lines entry to the log file."""
+    """Write a formatted JSON entry to a new log file."""
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f')
+    filename = os.path.join(LOG_DIR, f"fact_check_{timestamp}.json")
     try:
-        with open(log_filename, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        with open(filename, "w") as f:
+            json.dump(entry, f, indent=4)
+        print(f"[LOG] Saved to {filename}")
     except OSError as e:
         logger.error("Failed to write log entry: %s", e)
 
@@ -322,7 +323,7 @@ def callback():
                 print("  FACT DETECTOR ACTIVE")
                 print("  Listening for audio and checking facts in real-time...")
                 print(f"  Check interval: {FACT_CHECK_INTERVAL}s")
-                print(f"  Log file: {log_filename}")
+                print(f"  Log directory: {LOG_DIR}")
                 print("=" * 60 + "\n")
             else:
                 logger.warning("No audio streams available for fact-checking")
@@ -338,15 +339,17 @@ def callback():
         logger.info("Session stopped.")
 
         # Flush any remaining transcript in the buffer
+        remaining = None
         with buffer_lock:
             if transcript_buffer:
                 remaining = " ".join(transcript_buffer)
                 transcript_buffer.clear()
-                if len(remaining.split()) >= MIN_WORDS_FOR_CHECK:
-                    logger.info("Checking remaining buffered transcript...")
-                    claims = checker.check(remaining)
-                    display_claims(claims)
-                    log_claims(claims, remaining)
+
+        if remaining and len(remaining.split()) >= MIN_WORDS_FOR_CHECK:
+            logger.info("Checking remaining buffered transcript...")
+            claims = checker.check(remaining)
+            display_claims(claims)
+            log_claims(claims, remaining)
 
         # Log final session summary
         with stats_lock:
@@ -364,7 +367,7 @@ def callback():
             print(f"  FALSE: {session_stats['false']}")
             print(f"  UNCERTAIN: {session_stats['uncertain']}")
             print(f"  Chunks analyzed: {session_stats['chunks_analyzed']}")
-            print(f"  Full log: {log_filename}")
+            print(f"  Full logs in: {LOG_DIR}")
             print("=" * 60)
 
     elif event == "capture_session.exported":
@@ -407,7 +410,7 @@ def init_app():
     fact_thread.start()
     print("[INIT] Fact-check loop started.")
 
-    print(f"[INIT] Log file: {log_filename}")
+    print(f"[INIT] Log directory: {LOG_DIR}")
     print(f"\n[READY] Backend running on http://localhost:{PORT}")
     print("[READY] Now start the client:  python client.py\n")
 
