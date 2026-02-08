@@ -58,28 +58,6 @@ Misinformation spreads fast. Whether you're watching a news clip, sitting in a m
 - [VideoDB API key](https://console.videodb.io)
 - [Gemini API key](https://aistudio.google.com/apikey)
 
-### Capture Binary ( for Mac)
-
-The VideoDB capture binary (`recorder`) must be available. If you have a custom binary distribution (e.g., `amd_mx/`), create a shim package so the SDK can find it:
-
-```bash
-# Create the shim in your venv's site-packages
-mkdir -p venv/lib/python3.*/site-packages/videodb_capture_bin
-cat > venv/lib/python3.*/site-packages/videodb_capture_bin/__init__.py << 'EOF'
-import os
-_BINARY_DIR = "/path/to/your/binary/directory"  # e.g., ~/Downloads/amd_mx
-def get_binary_path():
-    return os.path.join(_BINARY_DIR, "recorder")
-EOF
-```
-
-If macOS blocks the binary ("Apple could not verify..."), remove the quarantine flag:
-
-```bash
-xattr -d com.apple.quarantine /path/to/recorder
-xattr -d com.apple.quarantine /path/to/librecorder.dylib
-```
-
 ### Installation
 
 ```bash
@@ -92,6 +70,30 @@ source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
+```
+
+### Capture Binary (macOS)
+
+The capture binary (`recorder`) is included in the `amd_mx/` directory. After creating your virtual environment, register it with the SDK:
+
+```bash
+# Create the shim package so the SDK can find the binary
+SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
+mkdir -p "$SITE_PACKAGES/videodb_capture_bin"
+cat > "$SITE_PACKAGES/videodb_capture_bin/__init__.py" << 'EOF'
+import os
+_BINARY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "amd_mx")
+_BINARY_DIR = os.path.normpath(_BINARY_DIR)
+def get_binary_path():
+    return os.path.join(_BINARY_DIR, "recorder")
+EOF
+```
+
+If macOS blocks the binary ("Apple could not verify..."), remove the quarantine flag:
+
+```bash
+xattr -d com.apple.quarantine amd_mx/recorder
+xattr -d com.apple.quarantine amd_mx/librecorder.dylib
 ```
 
 ### Environment Variables
@@ -131,7 +133,21 @@ source venv/bin/activate
 python client.py
 ```
 
-The client will request microphone and screen capture permissions. Once capture starts, play any video or join a meeting.
+The client will show an interactive menu to select your audio source:
+
+```
+What do you want to fact-check?
+
+  1. YouTube video
+  2. Google Meet call
+  3. Local video file
+
+Enter choice (1/2/3): 1
+Enter YouTube URL: https://www.youtube.com/watch?v=example
+[OPEN] Opening https://www.youtube.com/watch?v=example in your browser...
+```
+
+After you make your selection, the content opens automatically and capture begins. The client will then request microphone and screen capture permissions.
 
 ### Stop
 
