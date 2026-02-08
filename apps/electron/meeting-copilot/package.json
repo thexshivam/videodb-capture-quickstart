@@ -1,18 +1,15 @@
 {
-  "name": "async-recorder",
-  "version": "1.4.8",
-  "description": "A sample Electron application for screen and camera recording using VideoDB Capture SDK",
+  "name": "meeting-copilot",
+  "version": "1.4.0",
+  "description": "A sample Electron application for meetings using VideoDB Capture SDK",
   "main": "frontend/main.js",
   "scripts": {
-    "setup": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\setup.bat':'./scripts/setup.sh',{stdio:'inherit'})\"",
-    "start": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\start-server.bat':'./scripts/start-server.sh',{stdio:'inherit'})\"",
-    "setup:win": "scripts\\setup.bat",
-    "setup:unix": "./scripts/setup.sh",
-    "start:win": "scripts\\start-server.bat",
-    "start:unix": "./scripts/start-server.sh",
+    "start": "./scripts/start-server.sh",
+    "setup": "./scripts/setup.sh",
     "electron": "electron .",
     "dist": "electron-builder",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "VideoDB",
@@ -23,10 +20,11 @@
     "electron-builder": "^24.6.4"
   },
   "build": {
-    "appId": "com.videodb.async-recorder",
-    "productName": "Async Recorder",
+    "appId": "com.videodb.meeting-copilot",
+    "productName": "Meeting Copilot",
     "files": [
       "frontend/**/*",
+      "config.json",
       "package.json",
       "resources/**/*",
       "node_modules/videodb/**/*"
@@ -34,9 +32,8 @@
     "mac": {
       "identity": null,
       "extendInfo": {
-        "NSScreenCaptureUsageDescription": "Async Recorder needs screen recording permission to capture your display during sessions.",
-        "NSMicrophoneUsageDescription": "Async Recorder needs microphone access to capture audio during sessions.",
-        "NSCameraUsageDescription": "Async Recorder needs camera access to capture your webcam during sessions."
+        "NSScreenCaptureUsageDescription": "Meeting Copilot needs screen recording permission to capture your display during sessions.",
+        "NSMicrophoneUsageDescription": "Meeting Copilot needs microphone access to capture audio during sessions."
       },
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
@@ -81,10 +78,11 @@
     ]
   },
   "dependencies": {
+    "videodb": "github:video-db/videodb-node#release-0.4.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "sqlite3": "^5.1.7",
-    "videodb": "github:video-db/videodb-node#release-0.4.0"
+    "rtsp-relay": "^1.9.0",
+    "sqlite3": "^5.1.7"
   }
 }

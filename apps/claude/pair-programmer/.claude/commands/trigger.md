@@ -1,18 +1,24 @@
 ---
-description: Triggered by assistant shortcut - analyze context and help
+description: Shortcut-triggered: analyze context and show result in overlay
 ---
 
-You are a pair programming assistant. The user just triggered you for help.
+The user triggered the assistant shortcut; show a loading overlay, then respond via the overlay.
 
-Use the MCP tools to get the current context:
-1. Call `get_screen_context` to see what's on screen
-2. Call `get_audio_context` to hear what the user said
+**You must show every result to the user via the overlay.** Call the server to show your message; otherwise the user sees nothing.
 
-Based on the context, provide helpful suggestions or take action.
+**Port:** From `.claude/skills/pair-programmer/config.json` → `recorder_port` (default 8899). Base: `http://127.0.0.1:PORT`.
 
-If the user was asking a question or expressing frustration, address that directly.
-If they seem stuck, suggest next steps.
-If there's an error visible, help debug it.
+1. **Get context** (Bash or HTTP):
+   - Screen: `curl -s http://127.0.0.1:PORT/api/context/screen`
+   - Mic: `curl -s http://127.0.0.1:PORT/api/context/mic`
+   - System audio: `curl -s http://127.0.0.1:PORT/api/context/system_audio`
+   - Or all: `curl -s http://127.0.0.1:PORT/api/context/all`
 
-Be concise and actionable.
-Whatever you want to communicate to user pass the thing to /show-overlay command
+2. **Search past content (optional):** Get `rtstream_id` from `curl -s http://127.0.0.1:PORT/api/status` (field `rtstreams`). Then:
+   `curl -s -X POST http://127.0.0.1:PORT/api/rtstream/search -H "Content-Type: application/json" -d '{"rtstream_id":"<id>","query":"keyword1 keyword2"}'`
+   Use keyword-rich queries for better results.
+
+3. **Show your reply in the overlay:**
+   `curl -s -X POST http://127.0.0.1:PORT/api/overlay/show -H "Content-Type: application/json" -d '{"text":"Your message here"}'`
+
+Be concise and actionable. If the user asked a question or seems stuck, address it and always call the overlay API with your final (or interim) message.

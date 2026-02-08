@@ -1,46 +1,32 @@
-# Contributing to Async Recorder
+# Contributing
 
-Thank you for your interest in contributing to the Async Recorder app! We welcome contributions from the community.
+We welcome contributions! Here's how to get started:
 
-## Getting Started
+## Setup
 
-1.  **Fork the repository** on GitHub.
-2.  **Clone your fork** locally:
-    ```bash
-    git clone https://github.com/video-db/recorder-quickstart.git
-    cd apps/electron-async-recorder
-    ```
-3.  **Install dependencies**:
-    ```bash
-    npm install
-    ```
-4.  **Create a branch** for your feature or fix:
-    ```bash
-    git checkout -b feature/amazing-feature
-    ```
+```bash
+git clone https://github.com/video-db/videodb-capture-quickstart.git
+cd videodb-capture-quickstart/apps/electron/loom-electron
+npm install
+npm run setup
+npm start
+```
 
-## Development Workflow
+## Development
 
-
-- **Run the app**: `npm start`
-    - This will automatically set up the Python environment in `server/venv` and start both the backend and frontend.
-- **Backend Development**: The Python FastAPI backend is located in `server/`. Changes to python files will auto-reload the backend server.
-- **Linting**: Ensure your code follows the existing style. We currently use standard ESLint configuration for Electron apps.
+- **Run**: `npm start` - starts both Python backend and Electron app
+- **Backend**: Python code in `server/` auto-reloads on changes
 
 ## Submitting Changes
 
-1.  **Commit your changes** with clear, descriptive messages.
-2.  **Push to your fork**:
-    ```bash
-    git push origin feature/amazing-feature
-    ```
-3.  **Open a Pull Request** (PR) against the `main` branch of the original repository.
-4.  Describe your changes in the PR description, linking to any relevant issues.
+1. Fork the repo and create a feature branch
+2. Make your changes with clear commit messages
+3. Open a Pull Request against `main`
 
-## Reporting Issues
+## Issues
 
-If you find a bug or have a feature request, please open an issue on the [GitHub repository](https://github.com/video-db/recorder-quickstart/issues). Provide as much detail as possible, including steps to reproduce the issue.
+Report bugs or request features at [GitHub Issues](https://github.com/video-db/videodb-capture-quickstart/issues).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+Contributions are licensed under MIT.

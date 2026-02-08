@@ -1,7 +1,6 @@
 # Credentials and Config
 .env
 config.json
-auth_config.json
 
 # Dependencies
 node_modules/
@@ -14,8 +13,13 @@ dist/
 
 # Runtime / Local
 runtime.json
-*.db
+users.db
 server/venv/
-server/*.db
 __pycache__/
-*.pyc
+
+# Runtime / Local
+runtime.json
+users.db
+server/venv/
+__pycache__/
+auth_config.json

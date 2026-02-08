@@ -8,7 +8,15 @@ SERVER_DIR="$PROJECT_ROOT/server"
 VENV_DIR="$SERVER_DIR/venv"
 PYTHON_VERSION="3.12"
 
-echo "🚀 Starting Async Recorder (Electron + Python)..."
+echo "🚀 Starting Meeting Copilot (Electron + Python)..."
+
+# 0. Check for setup
+if [ ! -d "$PROJECT_ROOT/node_modules" ]; then
+    echo "❌ Error: Dependencies not found."
+    echo "💡 Please run the setup script first:"
+    echo "   npm run setup"
+    exit 1
+fi
 
 # 1. Ensure uv is installed (handles both Python and packages)
 if ! command -v uv &> /dev/null; then
