@@ -1,0 +1,184 @@
+app:
+  name: "VideoDB Focusd"
+  short_name: "Focusd"
+  author: "VideoDB"
+
+llm:
+  model: "ultra"
+  max_tokens:
+    micro_summary: 400
+    session_summary: 600
+    daily_summary: 800
+    deep_dive: 600
+
+# All timing defaults. User can override these in Settings UI.
+pipeline:
+  segment_flush_mins: 1      # L0 → L1 (raw events → activity segments)
+  micro_summary_mins: 2      # L1 → L2 (segments → micro-summaries via LLM)
+  session_summary_mins: 3   # L2 → L3 (micro-summaries → session summary via LLM)
+  idle_threshold_mins: 5      # minutes of no input before marking idle
+
+# VideoDB indexing config sent to the capture session
+indexing:
+  # model_name: "pro"       # optional: override the default indexing model
+  visual:
+    batch_type: "time"
+    batch_value: 3       # every 3 seconds
+    frame_count: 3
+  audio:
+    batch_type: "word"
+    batch_value: 15       # every 15 words
+
+# ─────────────────────────────────────────────────────────
+# Prompt Store
+# Variables use {{var}} syntax, replaced at runtime.
+# ─────────────────────────────────────────────────────────
+prompts:
+
+  # Sent to VideoDB visual indexing pipeline
+  visual_indexing: |
+    Analyze this screen recording frame. Only describe what you can actually see.
+    Extract:
+    1. Application name: read it from the title bar, menu bar, dock, or window chrome. If the name is not clearly visible, use a generic category like "Browser", "Code Editor", "Terminal", "Chat App", "Email Client", "Design Tool", "Document Editor". Never guess a specific app name you cannot read.
+    2. What the person is doing based on visible content
+    3. Specific visible content:
+       - Browser: page title, domain if visible (without .com/.org/etc suffixes), topic of the page
+       - Code editor: filename, language, project name from title bar or sidebar
+       - Chat app: workspace/channel name, conversation topic
+       - Terminal: visible command or output
+    4. Any other tab titles or window titles visible
+    Naming rules:
+    - App names: only use the specific name if you can read it on screen. Otherwise use the generic category.
+    - Website/service names: use the clean product name without domain suffixes (e.g. "Framer" not "framer.com", "GitHub" not "github.com", "YouTube" not "youtube.com")
+    - Project names: use the exact name as shown, no suffixes or variations
+    - Be consistent: the same app/site/project must always use the same name across frames
+    Format strictly as: [APP_NAME] | [ACTION] | [DETAILED_DESCRIPTION]
+
+  # Sent to VideoDB audio indexing pipeline
+  audio_indexing: |
+    Transcribe and summarize only what is actually being said. Do not infer or add content.
+    Include:
+    - Key topics and decisions discussed
+    - Action items or tasks mentioned
+    - Names of people, projects, or tools referenced
+    Only include what was actually spoken. Keep it concise.
+
+  # L1 → L2: Activity segments → micro-summary
+  micro_summary:
+    system: |
+      You are a productivity analyst for {{app_name}}.
+      Analyze activity segments and produce a brief, specific summary.
+      Rules:
+      - Use second person: "You spent time...", "You were reading...", "You coded..."
+      - NEVER say "the user" — always "you"
+      - Only mention apps and activities present in the provided data. If you are unsure about an app name, use a generic category like "browser" or "code editor". Never hallucinate a specific app name.
+      - If the input is empty or has no meaningful activity, respond with a summary like "No significant activity recorded"
+      - Reading technical content, documentation, or tutorials counts as PRODUCTIVE
+      - Be specific about what was done, not just which app was open
+      - 1 sentence max
+      Naming consistency:
+      - Use clean product/service names without domain suffixes (e.g. "Framer" not "framer.com")
+      - Use consistent casing and spelling for the same app/project throughout
+      - Merge duplicates: if the data mentions the same thing with different names (e.g. "framer.com" and "Framer"), unify to one clean name
+      Project naming rules:
+      - Only return a project name if you are CERTAIN the user is actively working on a specific, identifiable project (e.g. coding in a repo, editing a design file for a named project)
+      - A project is a named codebase, repository, design file, or specific deliverable — NOT a website being browsed, a random folder, or a generic activity
+      - If the user is just browsing, reading, chatting, or doing general work with no clear project, set project to null
+      - URLs, domains, folder names, and generic words are NOT project names
+      - If existing project names are provided below, REUSE them if the activity matches. Do not create a new name for the same project.
+      Always respond with valid JSON.
+    user: |
+      {{existing_projects_block}}Summarize these activity segments:
+
+      {{segments}}
+
+      Respond as JSON:
+      {
+        "summary": "One specific sentence in second person based strictly on the data above",
+        "project": "exact project name if certain, or null if not a clear project",
+        "primary_activity": "coding|browsing|communication|reading|meeting|designing|learning|other",
+        "productivity_label": "productive|neutral|distracted"
+      }
+
+  # L2 → L3: Micro-summaries → session summary
+  session_summary:
+    system: |
+      You are a productivity analyst for {{app_name}}.
+      Synthesize micro-summaries into a short session overview.
+      Rules:
+      - Use second person: "You spent time...", "You worked on..."
+      - NEVER say "the user" — always "you"
+      - Only reference apps and activities explicitly mentioned in the provided micro-summaries. Do not add anything not in the input. If an app name is unclear, use a generic term like "browser" or "code editor".
+      - Mention all apps/activities from the input, not just the primary one
+      - Be specific: what was coded, read, or discussed
+      - 1-2 sentences covering everything from the input
+      Naming consistency:
+      - Normalize names: use clean product names without domain suffixes (e.g. "Framer" not "framer.com")
+      - Merge duplicates that refer to the same app/site/project under one consistent name
+      - Use consistent casing throughout
+      Always respond with valid JSON.
+    user: |
+      Summarize this work session based strictly on the micro-summaries below:
+
+      {{micro_summaries}}
+
+      Respond as JSON:
+      {
+        "summary": "1-2 sentences in second person covering only the apps and activities mentioned above",
+        "key_activities": ["specific activity (duration)", "specific activity (duration)"],
+        "projects": {"project_name": duration_seconds},
+        "app_stats": {"app_name": duration_seconds},
+        "productivity_label": "productive|neutral|distracted"
+      }
+
+  # L3 → L4: Session summaries → daily summary
+  daily_summary:
+    system: |
+      You are a productivity coach for {{app_name}}.
+      Generate a brief, actionable daily report based strictly on the provided session data.
+      Rules:
+      - Only reference apps, projects, and activities present in the input. Do not add any app or activity not in the data. If unsure of a name, use a generic category.
+      - Normalize names: clean product names without domain suffixes, merge duplicates, consistent casing
+      - Highlights should be concrete achievements from the data
+      - Improvements should be actionable and based on observed patterns
+      - Keep everything short
+      Always respond with valid JSON.
+    user: |
+      Daily report for {{date}}.
+
+      Sessions:
+      {{session_data}}
+
+      Stats:
+      {{stats}}
+
+      Respond as JSON:
+      {
+        "headline": "5-8 word headline",
+        "summary": "2 sentence day overview",
+        "highlights": ["concrete highlight 1", "concrete highlight 2"],
+        "improvements": ["actionable suggestion"],
+        "sections": [
+          {"title": "Morning", "summary": "1 sentence", "start_hour": 9, "end_hour": 12}
+        ]
+      }
+
+  # On-demand deep dive into a specific time range
+  deep_dive:
+    system: |
+      You are a productivity analyst for {{app_name}}.
+      Write a short, direct breakdown of what happened in this time period based strictly on the provided events.
+      Use second person — "You were doing X", "You spent time on Y".
+      Only mention apps, sites, and activities that appear in the event data. If an app name is not clear from the data, use a generic term. Do not hallucinate specific app names.
+      Normalize names: clean product names without domain suffixes, merge duplicates, consistent casing.
+      Be specific and concise. No filler. 2-3 short paragraphs max.
+    user: |
+      Analyze this time period ({{event_count}} events):
+
+      {{events}}
+
+      Write a direct, specific breakdown based only on the events above:
+      - What you were working on and in which apps
+      - What you were reading/browsing
+      - Any conversations or meetings
+      Do not mention any app or activity not present in the data. Keep it short — 2-3 paragraphs, second person voice.
