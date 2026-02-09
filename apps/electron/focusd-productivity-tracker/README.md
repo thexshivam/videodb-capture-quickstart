@@ -59,7 +59,7 @@ These can also be adjusted from the **Settings** page in the app.
 npm install
 
 # Copy env template and add your VideoDB API key
-cp .env.example .env
+cp .env.sample .env
 
 # Run in dev mode
 npm run dev
