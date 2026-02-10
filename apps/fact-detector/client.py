@@ -34,7 +34,7 @@ def validate_local_file(path):
 
 def open_content(source_type, target):
     """Open the selected content source and wait for it to load."""
-    if source_type in ("youtube", "meet"):
+    if source_type in ("youtube", "meet", "stream"):
         print(f"[OPEN] Opening {target} in your browser...")
         webbrowser.open(target)
     elif source_type == "local":
@@ -44,25 +44,32 @@ def open_content(source_type, target):
     time.sleep(OPEN_DELAY_SECONDS)
 
 
+def validate_stream_url(url):
+    """Check if the URL looks like a valid stream/website URL."""
+    return url.startswith("http://") or url.startswith("https://")
+
+
 def show_menu():
     """Display an interactive menu to choose the audio source."""
     print("\nWhat do you want to fact-check?\n")
-    print("  1. YouTube video")
+    print("  1. YouTube / YouTube Live")
     print("  2. Google Meet call")
     print("  3. Local video file")
+    print("  4. Live stream (any URL)")
     print()
 
     options = {
         "1": ("youtube", "Enter YouTube URL: ", validate_youtube_url, "Invalid YouTube URL. Must contain youtube.com or youtu.be."),
         "2": ("meet", "Enter Google Meet URL: ", validate_meet_url, "Invalid Meet URL. Must contain meet.google.com."),
         "3": ("local", "Enter path to video file: ", validate_local_file, "File not found. Please check the path and try again."),
+        "4": ("stream", "Enter stream URL: ", validate_stream_url, "Invalid URL. Must start with http:// or https://."),
     }
 
     while True:
-        choice = input("Enter choice (1/2/3): ").strip()
+        choice = input("Enter choice (1/2/3/4): ").strip()
         if choice in options:
             break
-        print("Invalid choice. Please enter 1, 2, or 3.\n")
+        print("Invalid choice. Please enter 1, 2, 3, or 4.\n")
 
     source_type, prompt, validator, error_msg = options[choice]
 

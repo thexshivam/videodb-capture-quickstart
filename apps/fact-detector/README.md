@@ -1,12 +1,17 @@
 # Fact Detector
 
-Real-time fact-checking agent that captures system audio, transcribes it live, and verifies factual claims using Gemini AI.
+Real-time fact-checking agent that captures system audio, transcribes it live, and generates community-style notes on factual claims using Gemini AI.
 
-Works with any audio playing on your system: YouTube videos, local media, Google Meet calls, podcasts, webinars, etc.
+Works with any audio playing on your system: YouTube videos, YouTube Live streams, local media, Google Meet calls, podcasts, webinars, or any browser-based live stream.
 
-## Why It Matters
+## Features
 
-Misinformation spreads fast. Whether you're watching a news clip, sitting in a meeting, or reviewing a recorded presentation, having an automated fact-checker running in the background gives you immediate feedback on claims being made. No more taking things at face value.
+- **Community Notes output** -- claims are labeled as Verified, Misleading, or Needs Context with neutral explanations.
+- **Confidence scoring** -- every claim gets a high/medium/low confidence rating; only high-confidence notes are shown in the terminal to keep output clean.
+- **Sliding context window** -- carries the last ~150 words between check cycles so claims that span chunk boundaries are handled correctly
+- **Deduplication and throttling** -- repeated claims within a cooldown window are suppressed to prevent alert spam during long streams
+- **Structured JSON logging** -- every check cycle writes a log file with the transcript chunk, context used, notes with alerted/suppressed status, and summary counts
+- **Live stream support** -- menu includes YouTube Live, Google Meet, local files, and any generic stream URL
 
 ## Architecture
 
@@ -14,23 +19,24 @@ Misinformation spreads fast. Whether you're watching a news clip, sitting in a m
 +-------------------+     +-------------------+     +------------------+
 |  System Audio     | --> | VideoDB Capture   | --> | Real-time        |
 |  (YouTube, Meet,  |     | (audio stream)    |     | Transcription    |
-|   local video)    |     +-------------------+     | (WebSocket)      |
+|   live streams)   |     +-------------------+     | (WebSocket)      |
 +-------------------+                               +--------+---------+
                                                              |
                                                              v
                                                     +--------+---------+
                                                     | Transcript       |
-                                                    | Buffer           |
-                                                    | (rolling chunks) |
+                                                    | Buffer (deduped) |
                                                     +--------+---------+
                                                              |
                                                      every ~20 seconds
                                                              |
                                                              v
                                                     +--------+---------+
-                                                    | Gemini AI        |
-                                                    | (claim extraction|
-                                                    |  + fact-check)   |
+                                                    | Pipeline         |
+                                                    |  1. Preprocess   |
+                                                    |  2. Verify       |
+                                                    |  3. Generate     |
+                                                    |  4. Filter       |
                                                     +--------+---------+
                                                              |
                                                     +--------+---------+
@@ -42,42 +48,54 @@ Misinformation spreads fast. Whether you're watching a news clip, sitting in a m
                                             +-----------+    +----------------+
 ```
 
-**Components:**
+### Components
 
 | Component | File | Role |
 |-----------|------|------|
-| Backend | `backend.py` | Flask server, VideoDB sessions, webhooks, transcript buffering, fact-check orchestration |
+| Backend | `backend.py` | Flask server, VideoDB sessions, webhooks, transcript buffering, pipeline orchestration |
 | Client | `client.py` | Capture client, system audio streaming, permissions, shutdown |
-| Fact Checker | `fact_checker.py` | Gemini API integration, claim extraction, verdict classification |
+| Config | `config.py` | Centralized configuration for all components |
+| Pipeline | `pipeline/` | Modular fact-checking pipeline (see below) |
+
+### Pipeline Modules
+
+| Module | Purpose |
+|--------|---------|
+| `pipeline/__init__.py` | Orchestrates the full pipeline: preprocess -> verify -> generate -> filter |
+| `pipeline/claim_detector.py` | Cleans transcript, manages sliding context window |
+| `pipeline/verifier.py` | Gemini API call -- extracts claims, verifies, scores confidence |
+| `pipeline/note_generator.py` | Formats raw output into community notes (enforces length, neutral tone) |
+| `pipeline/alert_manager.py` | Confidence gating, deduplication, throttling |
 
 ## Setup
 
 ### Prerequisites
 
 - Python 3.10+
+- macOS (for system audio capture)
 - [VideoDB API key](https://console.videodb.io)
 - [Gemini API key](https://aistudio.google.com/apikey)
+- `cloudflared` for webhook tunneling:
+  ```bash
+  brew install cloudflared
+  ```
 
 ### Installation
 
 ```bash
-# Navigate to the fact-detector app
 cd apps/fact-detector
 
-# Create a virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
 ### Capture Binary (macOS)
 
-The capture binary (`recorder`) is included in the `amd_mx/` directory. After creating your virtual environment, register it with the SDK:
+The capture binary is included in the `amd_mx/` directory. After creating your virtual environment, register it with the SDK:
 
 ```bash
-# Create the shim package so the SDK can find the binary
 SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
 mkdir -p "$SITE_PACKAGES/videodb_capture_bin"
 cat > "$SITE_PACKAGES/videodb_capture_bin/__init__.py" << 'EOF'
@@ -89,7 +107,7 @@ def get_binary_path():
 EOF
 ```
 
-If macOS blocks the binary ("Apple could not verify..."), remove the quarantine flag:
+If macOS blocks the binary, remove the quarantine flag:
 
 ```bash
 xattr -d com.apple.quarantine amd_mx/recorder
@@ -98,18 +116,18 @@ xattr -d com.apple.quarantine amd_mx/librecorder.dylib
 
 ### Environment Variables
 
-Copy the example and fill in your keys:
-
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+Edit `.env` with your API keys:
 
 ```
 VIDEO_DB_API_KEY=your_videodb_api_key_here
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
+See [Configuration](#configuration) for optional settings.
 
 ## How to Run
 
@@ -133,85 +151,105 @@ source venv/bin/activate
 python client.py
 ```
 
-The client will show an interactive menu to select your audio source:
+The client shows an interactive menu:
 
 ```
 What do you want to fact-check?
 
-  1. YouTube video
+  1. YouTube / YouTube Live
   2. Google Meet call
   3. Local video file
+  4. Live stream (any URL)
 
-Enter choice (1/2/3): 1
-Enter YouTube URL: https://www.youtube.com/watch?v=example
-[OPEN] Opening https://www.youtube.com/watch?v=example in your browser...
+Enter choice (1/2/3/4):
 ```
 
-After you make your selection, the content opens automatically and capture begins. The client will then request microphone and screen capture permissions.
+After you select a source, the content opens automatically and capture begins. The client will request microphone and screen capture permissions.
 
 ### Stop
 
-Press `Ctrl+C` in the client terminal. The backend will flush remaining transcript and print a session summary.
+Press `Ctrl+C` in the client terminal. The backend will flush remaining transcript, run a final check, and print a session summary.
 
 ## Example Output
 
 ```
   [TRANSCRIPT] the great wall of china is visible from space with the naked eye
-  [TRANSCRIPT] mars has exactly two moons named phobos and deimos
-  [TRANSCRIPT] humans use only ten percent of their brains
-  [TRANSCRIPT] the speed of light is approximately three hundred thousand kilometers per second
+  [TRANSCRIPT] india's population surpassed china's in 2023
 
-[ANALYZING] Processing 80 words of transcript...
+[ANALYZING] Processing 42 words of transcript...
 
 ============================================================
-  FACT CHECK RESULTS  (4 claim(s) detected)
+  COMMUNITY NOTES  (2 note(s) from latest check)
 ============================================================
 
-[FACT CHECK !! FALSE]
-  Claim: "The Great Wall of China is visible from space with the naked eye."
-  Correction: "The Great Wall of China is not visible from space with the naked eye."
+  [MISLEADING] "The Great Wall of China is visible from space"
+  Note: The Great Wall is not visible to the naked eye from low Earth
+        orbit. This is a common misconception.
+  Sources: NASA.gov
+  Confidence: high
 
-[FACT CHECK -- TRUE]
-  Claim: "Mars has exactly two moons named Phobos and Deimos."
-  Note: "Mars has two moons, and their names are Phobos and Deimos."
-
-[FACT CHECK !! FALSE]
-  Claim: "Humans use only ten percent of their brains."
-  Correction: "This is a common myth; humans use all parts of their brains."
-
-[FACT CHECK -- TRUE]
-  Claim: "The speed of light is approximately 300,000 kilometers per second."
-  Note: "The speed of light in a vacuum is approximately 299,792 km/s."
+  [VERIFIED] "India's population surpassed China's in 2023"
+  Note: UN data confirms India became the most populous country
+        in April 2023.
+  Confidence: high
 
 ------------------------------------------------------------
-  Session totals: 4 claims | TRUE: 2 | FALSE: 2 | UNCERTAIN: 0
+  Session: 2 notes | Verified: 1 | Misleading: 1 | Needs Context: 0
 ------------------------------------------------------------
 ```
 
+Notes with medium or low confidence are logged to `logs/` but not displayed in the terminal.
+
 ## Log Files
 
-Each fact-check cycle writes a separate JSON file to the `logs/` directory. Each file contains:
+Each fact-check cycle writes a JSON file to `logs/`:
 
-- Timestamp
-- Transcript chunk analyzed
-- List of claims with verdicts
-- Summary counts
+```json
+{
+  "timestamp": "2025-01-15T10:03:34.510282+00:00",
+  "type": "fact_check",
+  "transcript_chunk": "...",
+  "context_used": "...",
+  "notes": [
+    {
+      "claim": "...",
+      "label": "misleading",
+      "confidence": "high",
+      "note": "...",
+      "sources": ["..."],
+      "alerted": true
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "alerted": 1,
+    "verified": 1,
+    "misleading": 1,
+    "needs_context": 0
+  }
+}
+```
 
-A final session summary file with aggregate statistics is written when the session stops.
+A session summary file is written when the session stops, with aggregate statistics including suppressed note counts.
 
 ## Configuration
 
-These can be set as environment variables or adjusted in `backend.py`:
+Set these in `.env` or as environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `VIDEO_DB_API_KEY` | (required) | VideoDB API key |
+| `GEMINI_API_KEY` | (required) | Gemini API key |
 | `PORT` | `5002` | Backend server port |
 | `FACT_CHECK_INTERVAL` | `20` | Seconds between fact-check cycles |
 | `MIN_WORDS_FOR_CHECK` | `15` | Minimum words before triggering a check |
+| `CONFIDENCE_THRESHOLD` | `high` | Minimum confidence to show as terminal alert |
+| `CONTEXT_WINDOW_WORDS` | `150` | Words of prior transcript carried as context |
+| `ALERT_COOLDOWN_SECONDS` | `30` | Seconds between alerts for similar claims |
 
 ## Built With
 
-- [VideoDB Capture](https://github.com/video-db/videodb-capture-quickstart) - System audio capture and real-time transcription
-- [Gemini AI](https://ai.google.dev/gemini-api/docs/libraries) (`google-genai` SDK) - Claim extraction and fact verification
-- [Flask](https://flask.palletsprojects.com) - Backend server
-- [pycloudflared](https://github.com/6abd/pycloudflared) - Webhook tunneling
+- [VideoDB Capture](https://github.com/video-db/videodb-capture-quickstart) -- System audio capture and real-time transcription
+- [Gemini AI](https://ai.google.dev/gemini-api/docs/libraries) (`google-genai` SDK) -- Claim extraction, verification, and confidence scoring
+- [Flask](https://flask.palletsprojects.com) -- Backend server
+- [pycloudflared](https://github.com/6abd/pycloudflared) -- Webhook tunneling

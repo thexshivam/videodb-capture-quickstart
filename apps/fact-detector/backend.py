@@ -11,26 +11,20 @@ from datetime import datetime, timezone
 
 from flask import Flask, request, jsonify
 from pycloudflared import try_cloudflare
-from dotenv import load_dotenv
 import videodb
 from videodb._constants import RTStreamChannelType
 
-from fact_checker import FactChecker
-
-# Configuration
-load_dotenv()
-
-VIDEO_DB_API_KEY = os.getenv("VIDEO_DB_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-PORT = int(os.getenv("PORT", "5002"))
-
-# How often (seconds) to send accumulated transcript to Gemini
-FACT_CHECK_INTERVAL = int(os.getenv("FACT_CHECK_INTERVAL", "20"))
-
-# Minimum word count before triggering a fact-check
-MIN_WORDS_FOR_CHECK = int(os.getenv("MIN_WORDS_FOR_CHECK", "15"))
-
-LOG_DIR = "logs"
+from config import (
+    VIDEO_DB_API_KEY,
+    GEMINI_API_KEY,
+    PORT,
+    FACT_CHECK_INTERVAL,
+    MIN_WORDS_FOR_CHECK,
+    LOG_DIR,
+)
+from pipeline import run_pipeline
+from pipeline.verifier import Verifier
+from pipeline.alert_manager import AlertManager
 
 if not VIDEO_DB_API_KEY:
     print("[ERROR] VIDEO_DB_API_KEY environment variable not set")
@@ -56,18 +50,38 @@ app = Flask(__name__)
 # Shared State
 conn = None
 public_url = None
-checker = None
+verifier = None
+alert_manager = None
 
-# Thread-safe transcript buffer
+# Thread-safe transcript buffer with deduplication
 transcript_buffer = []
+_recent_transcripts = []  # last N texts for dedup across WS + webhook
+_DEDUP_WINDOW = 20
 buffer_lock = threading.Lock()
+
+
+def _buffer_transcript(text):
+    """Append text to the transcript buffer, skipping duplicates."""
+    if text in _recent_transcripts:
+        return
+    _recent_transcripts.append(text)
+    if len(_recent_transcripts) > _DEDUP_WINDOW:
+        _recent_transcripts.pop(0)
+    transcript_buffer.append(text)
+
+# Sliding context window carried between cycles
+pipeline_context = ""
+context_lock = threading.Lock()
 
 # Session-level statistics
 session_stats = {
-    "total_claims": 0,
-    "true": 0,
-    "false": 0,
-    "uncertain": 0,
+    "total_notes": 0,
+    "verified": 0,
+    "misleading": 0,
+    "needs_context": 0,
+    "alerted": 0,
+    "suppressed_low_confidence": 0,
+    "suppressed_duplicate": 0,
     "chunks_analyzed": 0,
 }
 stats_lock = threading.Lock()
@@ -86,75 +100,83 @@ def log_to_file(entry):
         logger.error("Failed to write log entry: %s", e)
 
 
-def log_claims(claims, transcript_chunk):
+def log_notes(all_notes, transcript_chunk, context_used):
     """Write fact-check results as a structured log entry."""
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "type": "fact_check",
         "transcript_chunk": transcript_chunk,
-        "claims": claims,
+        "context_used": context_used,
+        "notes": all_notes,
         "summary": {
-            "total": len(claims),
-            "true": sum(1 for c in claims if c["verdict"] == "TRUE"),
-            "false": sum(1 for c in claims if c["verdict"] == "FALSE"),
-            "uncertain": sum(1 for c in claims if c["verdict"] == "UNCERTAIN"),
+            "total": len(all_notes),
+            "alerted": sum(1 for n in all_notes if n.get("alerted")),
+            "verified": sum(1 for n in all_notes if n["label"] == "verified"),
+            "misleading": sum(1 for n in all_notes if n["label"] == "misleading"),
+            "needs_context": sum(1 for n in all_notes if n["label"] == "needs_context"),
         },
     }
     log_to_file(entry)
 
 
 # Terminal Display
-VERDICT_LABELS = {
-    "TRUE": "[FACT CHECK -- TRUE]",
-    "FALSE": "[FACT CHECK !! FALSE]",
-    "UNCERTAIN": "[FACT CHECK ?? UNCERTAIN]",
-}
-
-
-def display_claims(claims):
-    """Print fact-check results to the terminal."""
-    if not claims:
+def display_notes(alerts):
+    """Print community-notes style results to the terminal."""
+    if not alerts:
         return
 
     print("\n" + "=" * 60)
-    print(f"  FACT CHECK RESULTS  ({len(claims)} claim(s) detected)")
+    print(f"  COMMUNITY NOTES  ({len(alerts)} note(s) from latest check)")
     print("=" * 60)
 
-    for claim in claims:
-        verdict = claim["verdict"]
-        label = VERDICT_LABELS.get(verdict, f"[{verdict}]")
-        print(f"\n{label}")
-        print(f'  Claim: "{claim["claim"]}"')
-        if claim.get("explanation"):
-            if verdict == "FALSE":
-                print(f'  Correction: "{claim["explanation"]}"')
-            else:
-                print(f'  Note: "{claim["explanation"]}"')
+    for note in alerts:
+        label = note["label"].upper()
+        print(f'\n  [{label}] "{note["claim"]}"')
+        if note.get("note"):
+            # Wrap long notes
+            note_text = note["note"]
+            print(f"  Note: {note_text}")
+        if note.get("sources"):
+            print(f"  Sources: {', '.join(note['sources'])}")
+        print(f"  Confidence: {note['confidence']}")
 
     print("\n" + "-" * 60)
 
     # Update and display running stats
     with stats_lock:
-        for claim in claims:
-            session_stats["total_claims"] += 1
-            key = claim["verdict"].lower()
-            if key in session_stats:
-                session_stats[key] += 1
-        session_stats["chunks_analyzed"] += 1
-
         print(
-            f"  Session totals: {session_stats['total_claims']} claims | "
-            f"TRUE: {session_stats['true']} | "
-            f"FALSE: {session_stats['false']} | "
-            f"UNCERTAIN: {session_stats['uncertain']}"
+            f"  Session: {session_stats['total_notes']} notes | "
+            f"Verified: {session_stats['verified']} | "
+            f"Misleading: {session_stats['misleading']} | "
+            f"Needs Context: {session_stats['needs_context']}"
         )
     print("-" * 60)
     sys.stdout.flush()
 
 
+def update_stats(all_notes, alerts):
+    """Update session statistics from a pipeline run."""
+    with stats_lock:
+        session_stats["chunks_analyzed"] += 1
+        for note in all_notes:
+            session_stats["total_notes"] += 1
+            label = note["label"]
+            if label in session_stats:
+                session_stats[label] += 1
+            if note.get("alerted"):
+                session_stats["alerted"] += 1
+            else:
+                if note.get("confidence") != "high":
+                    session_stats["suppressed_low_confidence"] += 1
+                else:
+                    session_stats["suppressed_duplicate"] += 1
+
+
 # Fact-Check Runner (background thread)
 def run_fact_check_loop():
-    """Periodically drain the transcript buffer and fact-check its contents."""
+    """Periodically drain the transcript buffer and run the pipeline."""
+    global pipeline_context
+
     logger.info(
         "Fact-check loop started (interval=%ds, min_words=%d)",
         FACT_CHECK_INTERVAL,
@@ -184,9 +206,19 @@ def run_fact_check_loop():
         logger.info("Analyzing chunk (%d words)...", word_count)
         print(f"\n[ANALYZING] Processing {word_count} words of transcript...")
 
-        claims = checker.check(chunk)
-        display_claims(claims)
-        log_claims(claims, chunk)
+        with context_lock:
+            ctx = pipeline_context
+
+        alerts, all_notes, new_context = run_pipeline(
+            chunk, ctx, verifier, alert_manager
+        )
+
+        with context_lock:
+            pipeline_context = new_context
+
+        update_stats(all_notes, alerts)
+        display_notes(alerts)
+        log_notes(all_notes, chunk, ctx)
 
 
 # WebSocket Listener
@@ -212,13 +244,9 @@ def start_ws_listener(result_queue, name="FactDetectorWS"):
                     if channel == "transcript":
                         text = data.get("text", "").strip()
                         is_final = data.get("is_final", False)
-                        # Only buffer final transcripts from the WebSocket.
-                        # Webhook callbacks also deliver transcripts; both
-                        # sources feed the same buffer so duplicates are
-                        # possible but harmless for fact-checking accuracy.
                         if text and is_final:
                             with buffer_lock:
-                                transcript_buffer.append(text)
+                                _buffer_transcript(text)
 
             except Exception as e:
                 logger.error("[%s] WebSocket error: %s", name, e)
@@ -281,7 +309,7 @@ def callback():
             if text and is_final:
                 print(f"  [TRANSCRIPT] {text}")
                 with buffer_lock:
-                    transcript_buffer.append(text)
+                    _buffer_transcript(text)
         return jsonify({"received": True})
 
     logger.info("[WEBHOOK] Event: %s", event)
@@ -335,8 +363,11 @@ def callback():
     elif event == "capture_session.stopping":
         logger.info("Session stopping...")
 
-    elif event == "capture_session.stopped":
-        logger.info("Session stopped.")
+    elif event == "capture_session.stopped" or event == "capture_session.failed":
+        if event == "capture_session.failed":
+            logger.warning("Session failed, but attempting to save remaining logs...")
+        else:
+            logger.info("Session stopped.")
 
         # Flush any remaining transcript in the buffer
         remaining = None
@@ -347,9 +378,15 @@ def callback():
 
         if remaining and len(remaining.split()) >= MIN_WORDS_FOR_CHECK:
             logger.info("Checking remaining buffered transcript...")
-            claims = checker.check(remaining)
-            display_claims(claims)
-            log_claims(claims, remaining)
+            with context_lock:
+                ctx = pipeline_context
+
+            alerts, all_notes, _ = run_pipeline(
+                remaining, ctx, verifier, alert_manager
+            )
+            update_stats(all_notes, alerts)
+            display_notes(alerts)
+            log_notes(all_notes, remaining, ctx)
 
         # Log final session summary
         with stats_lock:
@@ -362,13 +399,19 @@ def callback():
 
             print("\n" + "=" * 60)
             print("  SESSION SUMMARY")
-            print(f"  Total claims checked: {session_stats['total_claims']}")
-            print(f"  TRUE: {session_stats['true']}")
-            print(f"  FALSE: {session_stats['false']}")
-            print(f"  UNCERTAIN: {session_stats['uncertain']}")
+            print(f"  Total notes: {session_stats['total_notes']}")
+            print(f"  Verified: {session_stats['verified']}")
+            print(f"  Misleading: {session_stats['misleading']}")
+            print(f"  Needs Context: {session_stats['needs_context']}")
+            print(f"  Alerted: {session_stats['alerted']}")
+            print(f"  Suppressed (low confidence): {session_stats['suppressed_low_confidence']}")
+            print(f"  Suppressed (duplicate): {session_stats['suppressed_duplicate']}")
             print(f"  Chunks analyzed: {session_stats['chunks_analyzed']}")
             print(f"  Full logs in: {LOG_DIR}")
             print("=" * 60)
+
+        # Reset alert manager for next session
+        alert_manager.reset()
 
     elif event == "capture_session.exported":
         video_id = data.get("data", {}).get("exported_video_id")
@@ -381,8 +424,8 @@ def callback():
 
 # Initialization
 def init_app():
-    """Initialize VideoDB connection, Gemini checker, tunnel, and background tasks."""
-    global conn, public_url, checker
+    """Initialize VideoDB connection, pipeline components, tunnel, and background tasks."""
+    global conn, public_url, verifier, alert_manager
 
     print("=" * 60)
     print("  FACT DETECTOR - Real-time Fact Checking")
@@ -394,10 +437,14 @@ def init_app():
     conn = videodb.connect(api_key=VIDEO_DB_API_KEY)
     print("[INIT] VideoDB connected.")
 
-    # 2. Initialize Gemini fact-checker
-    print("[INIT] Initializing Gemini fact-checker...")
-    checker = FactChecker(api_key=GEMINI_API_KEY)
-    print("[INIT] Fact-checker ready.")
+    # 2. Initialize pipeline components
+    print("[INIT] Initializing Verifier...")
+    verifier = Verifier(api_key=GEMINI_API_KEY)
+    print("[INIT] Verifier ready.")
+
+    print("[INIT] Initializing AlertManager...")
+    alert_manager = AlertManager()
+    print("[INIT] AlertManager ready.")
 
     # 3. Start Cloudflare tunnel for webhooks
     print(f"[INIT] Starting Cloudflare tunnel on port {PORT}...")
