@@ -44,6 +44,8 @@ def _clean_note(text):
 
     # Truncate to max length at a word boundary
     if len(text) > MAX_NOTE_LENGTH:
-        text = text[:MAX_NOTE_LENGTH].rsplit(" ", 1)[0].rstrip(",.;:") + "..."
+        truncated = text[:MAX_NOTE_LENGTH - 3]  # reserve space for "..."
+        parts = truncated.rsplit(" ", 1)
+        text = parts[0].rstrip(",.;:") + "..." if len(parts) > 1 else truncated + "..."
 
     return text

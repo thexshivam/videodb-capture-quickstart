@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fact Detector</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      -webkit-app-region: no-drag;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      background: linear-gradient(180deg, #222222 0%, #1a1a1a 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      width: 400px;
+      height: 580px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+
+    /* Subtle top accent line */
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #0a84ff, #34c759, #ff9500);
+      border-radius: 12px 12px 0 0;
+      opacity: 0.6;
+    }
+
+    /* Toast system */
+    .toast-container {
+      position: absolute;
+      top: 52px;
+      left: 16px;
+      right: 16px;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+      pointer-events: auto;
+      animation: toastIn 0.25s ease-out;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .toast.fade-out {
+      animation: toastOut 0.3s ease-in forwards;
+    }
+
+    .toast.error {
+      background: rgba(255, 59, 48, 0.15);
+      border: 1px solid rgba(255, 59, 48, 0.3);
+      color: #ff6961;
+    }
+
+    .toast.success {
+      background: rgba(52, 199, 89, 0.15);
+      border: 1px solid rgba(52, 199, 89, 0.3);
+      color: #4cd964;
+    }
+
+    .toast.warning {
+      background: rgba(255, 149, 0, 0.15);
+      border: 1px solid rgba(255, 149, 0, 0.3);
+      color: #ffb340;
+    }
+
+    .toast-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .toast-title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .toast-detail {
+      opacity: 0.85;
+      font-size: 11px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-8px); }
+    }
+
+    /* Header (draggable) */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 12px 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+      cursor: grab;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+    }
+
+    .header:active {
+      cursor: grabbing;
+    }
+
+    .header-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      background: linear-gradient(135deg, #e0e0e0 0%, #a0a0a0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #8e8e93;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8e8e93;
+    }
+
+    .status-dot.active {
+      background: #34c759;
+      box-shadow: 0 0 6px rgba(52, 199, 89, 0.5);
+    }
+
+    .status-dot.starting {
+      background: #ff9500;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .header-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #8e8e93;
+      cursor: pointer;
+      transition: all 0.15s;
+      padding: 0;
+    }
+
+    .header-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #e0e0e0;
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .header-btn:active {
+      transform: scale(0.92);
+    }
+
+    .header-btn.close-btn:hover {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: rgba(255, 59, 48, 0.3);
+      color: #ff453a;
+    }
+
+    /* Activity indicators */
+    .activity-bar {
+      display: none;
+      padding: 8px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(52, 199, 89, 0.04);
+      flex-shrink: 0;
+    }
+
+    .activity-bar.visible {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #8e8e93;
+    }
+
+    .activity-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .activity-dot.audio {
+      background: #34c759;
+      color: #34c759;
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+
+    .activity-dot.transcription {
+      background: #0a84ff;
+      color: #0a84ff;
+      animation: dotWave 1.5s ease-in-out infinite;
+    }
+
+    .activity-dot.analysis {
+      background: #ff9500;
+      color: #ff9500;
+      animation: dotBlink 1.8s ease-in-out infinite;
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 4px currentColor; }
+      50% { opacity: 0.6; transform: scale(0.8); box-shadow: none; }
+    }
+
+    @keyframes dotWave {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+      50% { opacity: 0.3; box-shadow: 0 0 8px currentColor; }
+    }
+
+    @keyframes dotBlink {
+      0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+      40% { opacity: 0.2; box-shadow: none; }
+      60% { opacity: 1; box-shadow: 0 0 6px currentColor; }
+    }
+
+    .activity-label {
+      color: #a0a0a0;
+      letter-spacing: 0.2px;
+    }
+
+    /* Live transcript ticker */
+    .transcript-ticker {
+      display: none;
+      padding: 6px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 11px;
+      color: #6e6e73;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      background: rgba(10, 132, 255, 0.03);
+      flex-shrink: 0;
+    }
+
+    .transcript-ticker.visible {
+      display: block;
+    }
+
+    .transcript-ticker .ticker-label {
+      color: #0a84ff;
+      font-weight: 600;
+      margin-right: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .transcript-ticker .ticker-text {
+      color: #8e8e93;
+      font-style: italic;
+    }
+
+    /* Controls */
+    .controls {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      flex-shrink: 0;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      font-size: 12px;
+      color: #8e8e93;
+      width: 50px;
+      flex-shrink: 0;
+    }
+
+    select, input[type="text"] {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: #e0e0e0;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    select:disabled, input[type="text"]:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    select {
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238e8e93' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 28px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid #0a84ff;
+      outline-offset: 2px;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn-start {
+      background: linear-gradient(135deg, #0a84ff 0%, #0070e0 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(10, 132, 255, 0.3);
+    }
+
+    .btn-start:hover:not(:disabled) {
+      background: linear-gradient(135deg, #409cff 0%, #0a84ff 100%);
+      box-shadow: 0 3px 12px rgba(10, 132, 255, 0.4);
+    }
+
+    .btn-start:disabled {
+      background: rgba(10, 132, 255, 0.4);
+      cursor: not-allowed;
+    }
+
+    .btn-stop {
+      background: linear-gradient(135deg, #ff3b30 0%, #d32f2f 100%);
+      color: white;
+      box-shadow: 0 2px 8px rgba(255, 59, 48, 0.3);
+    }
+
+    .btn-stop:hover:not(:disabled) {
+      background: linear-gradient(135deg, #ff6961 0%, #ff3b30 100%);
+      box-shadow: 0 3px 12px rgba(255, 59, 48, 0.4);
+    }
+
+    .btn-stop:disabled {
+      background: rgba(255, 59, 48, 0.4);
+      cursor: not-allowed;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Alerts section */
+    .alerts-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8e8e93;
+      flex-shrink: 0;
+    }
+
+    .alert-count {
+      background: rgba(10, 132, 255, 0.15);
+      color: #409cff;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .alerts-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 16px 12px;
+      min-height: 0;
+    }
+
+    .alerts-feed::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .alerts-feed::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .alerts-feed::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+    }
+
+    .alert-card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      border-left: 3px solid #8e8e93;
+      transition: background 0.15s, border-left-width 0.15s;
+      animation: cardSlideIn 0.3s ease-out;
+    }
+
+    @keyframes cardSlideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .alert-card:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-left-width: 4px;
+    }
+
+    .alert-card.verified {
+      border-left-color: #34c759;
+    }
+
+    .alert-card.misleading {
+      border-left-color: #ff3b30;
+    }
+
+    .alert-card.needs_context {
+      border-left-color: #ff9500;
+    }
+
+    .alert-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .alert-label {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .alert-label.verified {
+      background: rgba(52, 199, 89, 0.2);
+      color: #34c759;
+    }
+
+    .alert-label.misleading {
+      background: rgba(255, 59, 48, 0.2);
+      color: #ff3b30;
+    }
+
+    .alert-label.needs_context {
+      background: rgba(255, 149, 0, 0.2);
+      color: #ff9500;
+    }
+
+    .alert-copy-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: #8e8e93;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.15s;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .alert-card:hover .alert-copy-btn {
+      opacity: 1;
+    }
+
+    .alert-copy-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #e0e0e0;
+    }
+
+    .alert-copy-btn:active {
+      transform: scale(0.9);
+    }
+
+    .alert-copy-btn.copied {
+      color: #34c759;
+      opacity: 1;
+    }
+
+    .alert-claim {
+      font-size: 13px;
+      line-height: 1.4;
+      color: #e0e0e0;
+      margin-bottom: 6px;
+      user-select: text;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .alert-note {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #a0a0a0;
+      margin-bottom: 4px;
+      user-select: text;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .alert-sources {
+      font-size: 11px;
+      color: #6e6e73;
+      user-select: text;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .alert-sources .source-label {
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .alert-sources a {
+      color: #409cff;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .alert-sources a:hover {
+      color: #64b5f6;
+      text-decoration: underline;
+    }
+
+    .alert-time {
+      font-size: 10px;
+      color: #6e6e73;
+      margin-top: 4px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #6e6e73;
+      font-size: 13px;
+      gap: 10px;
+    }
+
+    .empty-state-icon {
+      opacity: 0.3;
+      animation: emptyFloat 3s ease-in-out infinite;
+    }
+
+    @keyframes emptyFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .empty-state-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #8e8e93;
+    }
+
+    .empty-state-hint {
+      font-size: 11px;
+      color: #555;
+      max-width: 240px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* Footer stats */
+    .footer {
+      padding: 10px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      font-size: 11px;
+      color: #6e6e73;
+      flex-shrink: 0;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .footer-stats {
+      display: flex;
+      justify-content: space-around;
+      flex: 1;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #a0a0a0;
+    }
+
+    .stat-label {
+      color: #6e6e73;
+    }
+
+    .stat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .stat-dot.verified { background: #34c759; }
+    .stat-dot.misleading { background: #ff3b30; }
+    .stat-dot.needs_context { background: #ff9500; }
+
+    .footer-quit {
+      border: none;
+      background: none;
+      color: #6e6e73;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: inherit;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .footer-quit:hover {
+      color: #ff453a;
+      background: rgba(255, 59, 48, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Header -->
+    <div class="header">
+      <span class="header-title">Fact Detector</span>
+      <div class="header-actions">
+        <div class="status-badge" role="status" aria-live="polite">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Idle</span>
+        </div>
+        <button class="header-btn close-btn" id="closePopupBtn" title="Close popup">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3.5 3.5L10.5 10.5M10.5 3.5L3.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Activity indicators (visible when session active) -->
+    <div class="activity-bar" id="activityBar">
+      <div class="activity-item">
+        <span class="activity-dot audio"></span>
+        <span class="activity-label">Audio Capture</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-dot transcription"></span>
+        <span class="activity-label">Transcription</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-dot analysis"></span>
+        <span class="activity-label">Fact-Check</span>
+      </div>
+    </div>
+
+    <!-- Live transcript ticker -->
+    <div class="transcript-ticker" id="transcriptTicker">
+      <span class="ticker-label">Live</span>
+      <span class="ticker-text" id="tickerText">Waiting for audio...</span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="control-row">
+        <label for="sourceType">Source</label>
+        <select id="sourceType">
+          <option value="youtube">YouTube / YouTube Live</option>
+          <option value="meet">Google Meet</option>
+          <option value="local">Local video file</option>
+          <option value="stream">Live stream (URL)</option>
+        </select>
+      </div>
+      <div class="control-row">
+        <label for="targetInput" id="targetLabel">URL</label>
+        <input type="text" id="targetInput" placeholder="https://youtube.com/watch?v=...">
+      </div>
+      <div class="control-row">
+        <button class="btn btn-start" id="actionBtn" onclick="handleAction()">
+          Start Fact-Checking
+        </button>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="alerts-header">
+      <span>Alerts</span>
+      <span class="alert-count" id="alertCount">0</span>
+    </div>
+
+    <div class="alerts-feed" id="alertsFeed">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="16" stroke="#555" stroke-width="1.5" stroke-dasharray="3 3"/>
+            <path d="M15 20L18 23L25 16" stroke="#555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="empty-state-title">No alerts yet</div>
+        <div class="empty-state-hint">Pick a source above and start fact-checking. Alerts will appear here as claims are verified.</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-stats">
+        <div class="stat">
+          <span class="stat-value" id="statTotal">0</span>
+          <span class="stat-label">Notes</span>
+        </div>
+        <div class="stat">
+          <span class="stat-dot verified"></span>
+          <span class="stat-value" id="statVerified">0</span>
+          <span class="stat-label">Verified</span>
+        </div>
+        <div class="stat">
+          <span class="stat-dot misleading"></span>
+          <span class="stat-value" id="statMisleading">0</span>
+          <span class="stat-label">Misleading</span>
+        </div>
+        <div class="stat">
+          <span class="stat-dot needs_context"></span>
+          <span class="stat-value" id="statContext">0</span>
+          <span class="stat-label">Context</span>
+        </div>
+      </div>
+      <button class="footer-quit" id="quitBtn" title="Quit Fact Detector">Quit</button>
+    </div>
+  </div>
+
+  <script>
+    // Constants
+    const MAX_ALERTS = 200;
+
+    // State
+    let isActive = false;
+    let alertNotes = [];
+    let stats = { total_notes: 0, verified: 0, misleading: 0, needs_context: 0 };
+    let lastSeenAlertId = 0;
+    let sessionStartTime = 0;
+    let statsPollingTimer = null;
+    let statsSlowdownTimer = null;
+    let timestampUpdateTimer = null;
+
+    // Elements
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const sourceType = document.getElementById('sourceType');
+    const targetInput = document.getElementById('targetInput');
+    const targetLabel = document.getElementById('targetLabel');
+    const actionBtn = document.getElementById('actionBtn');
+    const alertsFeed = document.getElementById('alertsFeed');
+    const alertCount = document.getElementById('alertCount');
+    const emptyState = document.getElementById('emptyState');
+    const transcriptTicker = document.getElementById('transcriptTicker');
+    const tickerText = document.getElementById('tickerText');
+    const toastContainer = document.getElementById('toastContainer');
+    const activityBar = document.getElementById('activityBar');
+
+    // Header buttons
+    document.getElementById('closePopupBtn').addEventListener('click', () => {
+      window.factDetector.hideWindow();
+    });
+    document.getElementById('quitBtn').addEventListener('click', () => {
+      window.factDetector.quitApp();
+    });
+
+    // Source type placeholders
+    const placeholders = {
+      youtube: 'https://youtube.com/watch?v=...',
+      meet: 'https://meet.google.com/...',
+      local: '/path/to/video.mp4',
+      stream: 'https://...',
+    };
+
+    const labels = {
+      youtube: 'URL',
+      meet: 'URL',
+      local: 'Path',
+      stream: 'URL',
+    };
+
+    sourceType.addEventListener('change', () => {
+      targetInput.placeholder = placeholders[sourceType.value] || '';
+      targetLabel.textContent = labels[sourceType.value] || 'URL';
+    });
+
+    // -----------------------------------------------------------------------
+    // Toast system
+    // -----------------------------------------------------------------------
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showToast(title, detail, type = 'error', duration = 7000) {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-body">
+          <div class="toast-title">${escapeHtml(title)}</div>
+          ${detail ? `<div class="toast-detail">${escapeHtml(detail)}</div>` : ''}
+        </div>
+      `;
+      toastContainer.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('fade-out');
+        toast.addEventListener('animationend', () => toast.remove());
+      }, duration);
+    }
+
+    // -----------------------------------------------------------------------
+    // Actions
+    // -----------------------------------------------------------------------
+
+    async function handleAction() {
+      if (isActive) {
+        await stopSession();
+      } else {
+        await startSession();
+      }
+    }
+
+    function validateTarget(source, target) {
+      if (!target) return 'Please enter a URL or path for the source.';
+      if (target.includes('\n') || target.includes('\r')) return 'Input cannot contain newlines.';
+      if (source === 'local') return null; // file paths are flexible
+      try {
+        const url = new URL(target);
+        if (!['http:', 'https:'].includes(url.protocol)) return 'URL must start with http:// or https://';
+      } catch {
+        return 'Please enter a valid URL.';
+      }
+      return null;
+    }
+
+    async function startSession() {
+      const source = sourceType.value;
+      const target = targetInput.value.trim();
+
+      const validationError = validateTarget(source, target);
+      if (validationError) {
+        targetInput.style.borderColor = '#ff3b30';
+        showToast('Invalid input', validationError, 'warning');
+        setTimeout(() => { targetInput.style.borderColor = ''; }, 1500);
+        return;
+      }
+
+      setStatus('starting', 'Starting...');
+      actionBtn.disabled = true;
+      actionBtn.innerHTML = '<span class="spinner"></span> Starting...';
+      sourceType.disabled = true;
+      targetInput.disabled = true;
+
+      try {
+        const result = await window.factDetector.startSession({
+          sourceType: source,
+          target: target,
+        });
+
+        if (result.success) {
+          isActive = true;
+          sessionStartTime = Date.now();
+          setStatus('active', 'Active');
+          actionBtn.className = 'btn btn-stop';
+          actionBtn.innerHTML = 'Stop Fact-Checking';
+          actionBtn.disabled = false;
+          activityBar.classList.add('visible');
+          transcriptTicker.classList.add('visible');
+          startStatsPolling();
+          startTimestampUpdates();
+        } else {
+          setStatus('idle', 'Failed');
+          actionBtn.className = 'btn btn-start';
+          actionBtn.innerHTML = 'Start Fact-Checking';
+          actionBtn.disabled = false;
+          sourceType.disabled = false;
+          targetInput.disabled = false;
+          showToast('Session failed', result.error || 'Could not start session.', 'error');
+          setTimeout(() => setStatus('idle', 'Idle'), 3000);
+        }
+      } catch (err) {
+        setStatus('idle', 'Failed');
+        actionBtn.className = 'btn btn-start';
+        actionBtn.innerHTML = 'Start Fact-Checking';
+        actionBtn.disabled = false;
+        sourceType.disabled = false;
+        targetInput.disabled = false;
+        showToast('Session error', err.message || 'Unexpected error starting session.', 'error');
+        setTimeout(() => setStatus('idle', 'Idle'), 3000);
+      }
+    }
+
+    async function stopSession() {
+      setStatus('starting', 'Stopping...');
+      actionBtn.disabled = true;
+      actionBtn.innerHTML = '<span class="spinner"></span> Stopping...';
+
+      await window.factDetector.stopSession();
+
+      resetToIdle();
+    }
+
+    function resetToIdle() {
+      isActive = false;
+      setStatus('idle', 'Idle');
+      actionBtn.className = 'btn btn-start';
+      actionBtn.innerHTML = 'Start Fact-Checking';
+      actionBtn.disabled = false;
+      sourceType.disabled = false;
+      targetInput.disabled = false;
+      activityBar.classList.remove('visible');
+      transcriptTicker.classList.remove('visible');
+      tickerText.textContent = 'Waiting for audio...';
+      stopStatsPolling();
+      stopTimestampUpdates();
+
+      // Restore empty state if no alerts
+      if (alertNotes.length === 0) {
+        emptyState.style.display = '';
+      }
+    }
+
+    function setStatus(state, text) {
+      statusDot.className = 'status-dot';
+      if (state === 'active') statusDot.classList.add('active');
+      if (state === 'starting') statusDot.classList.add('starting');
+      statusText.textContent = text;
+    }
+
+    // -----------------------------------------------------------------------
+    // Alert rendering
+    // -----------------------------------------------------------------------
+
+    function formatRelativeTime(ts) {
+      const diff = Math.floor((Date.now() - ts) / 1000);
+      if (diff < 10) return 'just now';
+      if (diff < 60) return `${diff}s ago`;
+      const mins = Math.floor(diff / 60);
+      if (mins < 60) return `${mins}m ago`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `${hours}h ago`;
+      return `${Math.floor(hours / 24)}d ago`;
+    }
+
+    function addAlertNotes(notes) {
+      if (!notes || notes.length === 0) return;
+
+      emptyState.style.display = 'none';
+
+      // Preserve scroll position if user has scrolled down
+      const wasScrolledToTop = alertsFeed.scrollTop < 10;
+
+      for (const note of notes) {
+        note._ts = Date.now();
+        alertNotes.unshift(note);
+        const card = createAlertCard(note);
+        alertsFeed.prepend(card);
+      }
+
+      // Only auto-scroll to top for new alerts if user was already at top
+      if (wasScrolledToTop) {
+        alertsFeed.scrollTop = 0;
+      }
+
+      // Cap alerts at MAX_ALERTS
+      while (alertNotes.length > MAX_ALERTS) {
+        alertNotes.pop();
+        const children = alertsFeed.querySelectorAll('.alert-card');
+        if (children.length > MAX_ALERTS) {
+          children[children.length - 1].remove();
+        }
+      }
+
+      alertCount.textContent = alertNotes.length;
+    }
+
+    function createAlertCard(note) {
+      const card = document.createElement('div');
+      const label = note.label || 'unknown';
+      card.className = `alert-card ${label}`;
+
+      // Header row with label and copy button
+      const headerRow = document.createElement('div');
+      headerRow.className = 'alert-header-row';
+
+      const labelBadge = document.createElement('span');
+      labelBadge.className = `alert-label ${label}`;
+      labelBadge.textContent = label.replace('_', ' ');
+      headerRow.appendChild(labelBadge);
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'alert-copy-btn';
+      copyBtn.title = 'Copy to clipboard';
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V2.5A1.5 1.5 0 008 1H2.5A1.5 1.5 0 001 2.5V8a1.5 1.5 0 001.5 1.5h2" stroke="currentColor" stroke-width="1.3"/></svg>';
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyAlertToClipboard(note, copyBtn);
+      });
+      headerRow.appendChild(copyBtn);
+
+      card.appendChild(headerRow);
+
+      const claim = document.createElement('div');
+      claim.className = 'alert-claim';
+      claim.textContent = `"${note.claim}"`;
+      card.appendChild(claim);
+
+      if (note.note) {
+        const noteText = document.createElement('div');
+        noteText.className = 'alert-note';
+        noteText.textContent = `Note: ${note.note}`;
+        card.appendChild(noteText);
+      }
+
+      if (note.sources && note.sources.length > 0) {
+        const sources = document.createElement('div');
+        sources.className = 'alert-sources';
+        const label = document.createElement('span');
+        label.className = 'source-label';
+        label.textContent = 'Sources:';
+        sources.appendChild(label);
+        for (let i = 0; i < note.sources.length; i++) {
+          const src = note.sources[i];
+          if (src.startsWith('http://') || src.startsWith('https://')) {
+            const link = document.createElement('a');
+            link.href = src;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            try { link.textContent = new URL(src).hostname.replace('www.', ''); } catch { link.textContent = src; }
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              window.factDetector.openExternal(src);
+            });
+            sources.appendChild(link);
+          } else {
+            const text = document.createElement('span');
+            text.textContent = src;
+            sources.appendChild(text);
+          }
+          if (i < note.sources.length - 1) {
+            sources.appendChild(document.createTextNode(', '));
+          }
+        }
+        card.appendChild(sources);
+      }
+
+      const timeEl = document.createElement('div');
+      timeEl.className = 'alert-time';
+      timeEl.setAttribute('data-ts', note._ts || Date.now());
+      timeEl.textContent = 'just now';
+      card.appendChild(timeEl);
+
+      return card;
+    }
+
+    function copyAlertToClipboard(note, btn) {
+      const label = (note.label || 'unknown').toUpperCase().replace('_', ' ');
+      let text = `[${label}] "${note.claim}"`;
+      if (note.note) text += `\nNote: ${note.note}`;
+      if (note.sources && note.sources.length > 0) {
+        text += `\nSources: ${note.sources.join(', ')}`;
+      }
+
+      navigator.clipboard.writeText(text).then(() => {
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5L5.5 10.5L11.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V2.5A1.5 1.5 0 008 1H2.5A1.5 1.5 0 001 2.5V8a1.5 1.5 0 001.5 1.5h2" stroke="currentColor" stroke-width="1.3"/></svg>';
+        }, 1500);
+      }).catch(() => {
+        showToast('Copy failed', 'Could not copy to clipboard.', 'warning');
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // Timestamps
+    // -----------------------------------------------------------------------
+
+    function updateAllTimestamps() {
+      const timeEls = alertsFeed.querySelectorAll('.alert-time[data-ts]');
+      for (const el of timeEls) {
+        const ts = parseInt(el.getAttribute('data-ts'), 10);
+        if (ts) el.textContent = formatRelativeTime(ts);
+      }
+    }
+
+    function startTimestampUpdates() {
+      stopTimestampUpdates();
+      timestampUpdateTimer = setInterval(updateAllTimestamps, 15000);
+    }
+
+    function stopTimestampUpdates() {
+      if (timestampUpdateTimer) {
+        clearInterval(timestampUpdateTimer);
+        timestampUpdateTimer = null;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Stats polling
+    // -----------------------------------------------------------------------
+
+    function startStatsPolling() {
+      stopStatsPolling();
+      pollStats();
+      // Poll fast initially (every 2s) to update transcript ticker quickly, then slow down
+      statsPollingTimer = setInterval(pollStats, 2000);
+      statsSlowdownTimer = setTimeout(() => {
+        statsSlowdownTimer = null;
+        if (statsPollingTimer) {
+          clearInterval(statsPollingTimer);
+          statsPollingTimer = setInterval(pollStats, 5000);
+        }
+      }, 30000);
+    }
+
+    function stopStatsPolling() {
+      if (statsSlowdownTimer) {
+        clearTimeout(statsSlowdownTimer);
+        statsSlowdownTimer = null;
+      }
+      if (statsPollingTimer) {
+        clearInterval(statsPollingTimer);
+        statsPollingTimer = null;
+      }
+    }
+
+    async function pollStats() {
+      try {
+        const result = await window.factDetector.getStats();
+        if (result) {
+          updateStats(result);
+        }
+      } catch (e) {
+        // Backend may not be ready yet
+      }
+    }
+
+    function updateStats(newStats) {
+      stats = { ...stats, ...newStats };
+      document.getElementById('statTotal').textContent = stats.total_notes || 0;
+      document.getElementById('statVerified').textContent = stats.verified || 0;
+      document.getElementById('statMisleading').textContent = stats.misleading || 0;
+      document.getElementById('statContext').textContent = stats.needs_context || 0;
+
+      // Update live transcript ticker with progressive messages
+      if (newStats.last_transcript) {
+        tickerText.textContent = `"${newStats.last_transcript}${newStats.last_transcript.length >= 80 ? '...' : ''}"`;
+        tickerText.style.fontStyle = 'italic';
+      } else if (newStats.chunks_analyzed > 0) {
+        tickerText.textContent = 'Processing transcript...';
+      } else if (isActive) {
+        // Cycle through progress messages so the user knows it's not stuck
+        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        if (elapsed < 10) {
+          tickerText.textContent = 'Connecting to audio stream...';
+        } else if (elapsed < 25) {
+          tickerText.textContent = 'Capturing audio, waiting for speech...';
+        } else {
+          tickerText.textContent = 'Listening... first check runs at ~30s';
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // IPC listeners
+    // -----------------------------------------------------------------------
+
+    window.factDetector.onFactCheckAlert((data) => {
+      // Deduplicate: skip alerts we've already processed (e.g. after SSE reconnect)
+      if (data.id && data.id <= lastSeenAlertId) return;
+      if (data.id) lastSeenAlertId = data.id;
+
+      if (data.all_notes) {
+        addAlertNotes(data.all_notes);
+      }
+
+      // Sync stats from server instead of local accumulation to avoid double-count
+      pollStats();
+    });
+
+    window.factDetector.onSessionStatus((status) => {
+      if (status === 'stopped') {
+        resetToIdle();
+      }
+    });
+
+    window.factDetector.onBackendStatus((status) => {
+      if (status === 'stopped') {
+        resetToIdle();
+        setStatus('idle', 'Backend stopped');
+      }
+    });
+
+    window.factDetector.onErrorMessage((data) => {
+      showToast(data.title || 'Error', data.detail || 'An unexpected error occurred.', 'error');
+    });
+
+    // -----------------------------------------------------------------------
+    // Cleanup on window unload
+    // -----------------------------------------------------------------------
+
+    window.addEventListener('beforeunload', () => {
+      stopStatsPolling();
+      stopTimestampUpdates();
+    });
+
+    // -----------------------------------------------------------------------
+    // Session state recovery on popup reload
+    // -----------------------------------------------------------------------
+
+    (async function recoverSessionState() {
+      try {
+        const state = await window.factDetector.getSessionState();
+        if (state && (state.backendRunning || state.clientRunning)) {
+          isActive = true;
+          setStatus('active', 'Active');
+          actionBtn.className = 'btn btn-stop';
+          actionBtn.innerHTML = 'Stop Fact-Checking';
+          sourceType.disabled = true;
+          targetInput.disabled = true;
+          activityBar.classList.add('visible');
+          transcriptTicker.classList.add('visible');
+          startStatsPolling();
+          startTimestampUpdates();
+        }
+      } catch (e) {
+        // Ignore — first load
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -47,7 +47,7 @@ For each verifiable factual claim in the NEW TRANSCRIPT section:
 2. Assign a label: "verified", "misleading", or "needs_context"
 3. Rate your confidence: "high", "medium", or "low"
 4. Write a brief, neutral note (1-2 sentences max, like a community note)
-5. Optionally suggest 1-2 authoritative sources
+5. Suggest 1-2 authoritative sources as full URLs (e.g. "https://www.bbc.com/news/...", "https://reuters.com/..."). Use real, well-known URLs that are likely to cover the topic. If no specific URL is known, use the homepage of a relevant authoritative outlet (e.g. "https://www.nasa.gov", "https://www.who.int").
 
 Respond ONLY with a JSON array. Each element:
 {{
@@ -55,7 +55,7 @@ Respond ONLY with a JSON array. Each element:
   "label": "verified" | "misleading" | "needs_context",
   "confidence": "high" | "medium" | "low",
   "note": "brief neutral explanation",
-  "sources": ["optional source"]
+  "sources": ["https://example.com/relevant-article"]
 }}
 
 If no verifiable factual claims exist, return: []"""
@@ -134,12 +134,15 @@ class Verifier:
                 confidence = item.get("confidence", "low").lower()
                 if confidence not in valid_confidence:
                     confidence = "low"
+                sources = item.get("sources", [])
+                if not isinstance(sources, list):
+                    sources = [str(sources)] if sources else []
                 validated.append({
-                    "claim": item["claim"],
+                    "claim": str(item["claim"]),
                     "label": label,
                     "confidence": confidence,
-                    "note": item.get("note", ""),
-                    "sources": item.get("sources", []),
+                    "note": str(item.get("note", "")),
+                    "sources": sources,
                 })
             return validated
 

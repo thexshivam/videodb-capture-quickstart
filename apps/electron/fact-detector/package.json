@@ -1,0 +1,32 @@
+{
+  "name": "fact-detector-desktop",
+  "version": "1.0.0",
+  "description": "Real-time fact-checking tray app",
+  "main": "frontend/main.js",
+  "scripts": {
+    "start": "./scripts/start.sh",
+    "setup": "./scripts/setup.sh",
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  },
+  "build": {
+    "appId": "com.videodb.fact-detector",
+    "productName": "Fact Detector",
+    "mac": {
+      "identity": null,
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSMicrophoneUsageDescription": "Needed to capture audio for fact-checking.",
+        "NSScreenCaptureUsageDescription": "Needed to capture system audio."
+      },
+      "target": ["dmg", "zip"]
+    },
+    "files": ["frontend/**/*", "package.json"]
+  }
+}

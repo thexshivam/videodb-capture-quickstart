@@ -1,139 +1,157 @@
 # Fact Detector
 
-Real-time fact-checking agent that captures system audio, transcribes it live, and generates community-style notes on factual claims using Gemini AI.
+Real-time fact-checking that listens to any audio on your Mac and tells you what's true, misleading, or needs more context -- powered by VideoDB Capture and Gemini AI.
 
-Works with any audio playing on your system: YouTube videos, YouTube Live streams, local media, Google Meet calls, podcasts, webinars, or any browser-based live stream.
+Play a YouTube video, join a Google Meet, or stream a podcast. Fact Detector captures the audio, transcribes it live, and generates community-style notes on every factual claim it hears.
 
-## Features
+## What You'll Need
 
-- **Community Notes output** -- claims are labeled as Verified, Misleading, or Needs Context with neutral explanations.
-- **Confidence scoring** -- every claim gets a high/medium/low confidence rating; only high-confidence notes are shown in the terminal to keep output clean.
-- **Sliding context window** -- carries the last ~150 words between check cycles so claims that span chunk boundaries are handled correctly
-- **Deduplication and throttling** -- repeated claims within a cooldown window are suppressed to prevent alert spam during long streams
-- **Structured JSON logging** -- every check cycle writes a log file with the transcript chunk, context used, notes with alerted/suppressed status, and summary counts
-- **Live stream support** -- menu includes YouTube Live, Google Meet, local files, and any generic stream URL
+Before you start, make sure you have:
 
-## Architecture
+- **macOS** (required for system audio capture)
+- **Node.js 18+** -- [download here](https://nodejs.org) if you don't have it
+- **A VideoDB API key** -- sign up free at [console.videodb.io](https://console.videodb.io)
+- **A Gemini API key** -- get one at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
-```
-+-------------------+     +-------------------+     +------------------+
-|  System Audio     | --> | VideoDB Capture   | --> | Real-time        |
-|  (YouTube, Meet,  |     | (audio stream)    |     | Transcription    |
-|   live streams)   |     +-------------------+     | (WebSocket)      |
-+-------------------+                               +--------+---------+
-                                                             |
-                                                             v
-                                                    +--------+---------+
-                                                    | Transcript       |
-                                                    | Buffer (deduped) |
-                                                    +--------+---------+
-                                                             |
-                                                     every ~20 seconds
-                                                             |
-                                                             v
-                                                    +--------+---------+
-                                                    | Pipeline         |
-                                                    |  1. Preprocess   |
-                                                    |  2. Verify       |
-                                                    |  3. Generate     |
-                                                    |  4. Filter       |
-                                                    +--------+---------+
-                                                             |
-                                                    +--------+---------+
-                                                    |                  |
-                                                    v                  v
-                                            +-----------+    +----------------+
-                                            | Terminal   |    | Log File       |
-                                            | Alerts     |    | (JSON)         |
-                                            +-----------+    +----------------+
+Check if Node.js is installed by running:
+
+```bash
+node --version
 ```
 
-### Components
+If you see a version number (e.g. `v20.11.0`), you're good.
 
-| Component | File | Role |
-|-----------|------|------|
-| Backend | `backend.py` | Flask server, VideoDB sessions, webhooks, transcript buffering, pipeline orchestration |
-| Client | `client.py` | Capture client, system audio streaming, permissions, shutdown |
-| Config | `config.py` | Centralized configuration for all components |
-| Pipeline | `pipeline/` | Modular fact-checking pipeline (see below) |
+## Quick Start (Desktop App)
 
-### Pipeline Modules
+This is the recommended way to run Fact Detector. Everything runs from a single icon in your menu bar.
 
-| Module | Purpose |
-|--------|---------|
-| `pipeline/__init__.py` | Orchestrates the full pipeline: preprocess -> verify -> generate -> filter |
-| `pipeline/claim_detector.py` | Cleans transcript, manages sliding context window |
-| `pipeline/verifier.py` | Gemini API call -- extracts claims, verifies, scores confidence |
-| `pipeline/note_generator.py` | Formats raw output into community notes (enforces length, neutral tone) |
-| `pipeline/alert_manager.py` | Confidence gating, deduplication, throttling |
+### Step 1: Go to the Electron app folder
 
-## Setup
+```bash
+cd apps/electron/fact-detector
+```
 
-### Prerequisites
+### Step 2: Run the setup (first time only)
 
-- Python 3.10+
-- macOS (for system audio capture)
-- [VideoDB API key](https://console.videodb.io)
-- [Gemini API key](https://aistudio.google.com/apikey)
-- `cloudflared` for webhook tunneling:
-  ```bash
-  brew install cloudflared
-  ```
+```bash
+npm run setup
+```
 
-### Installation
+This will:
+1. Ask for your VideoDB and Gemini API keys
+2. Install all dependencies (Node.js + Python)
+3. Create a Python virtual environment automatically
+
+You only need to do this once.
+
+### Step 3: Start the app
+
+```bash
+npm start
+```
+
+That's it — this single command starts everything. You do **not** need to start the backend or any server manually. The app handles it all behind the scenes.
+
+A small icon appears in your macOS menu bar (top-right of your screen). Click it to open the popup.
+
+> **Note:** If port 5002 is already in use from a previous run, free it first:
+> ```bash
+> lsof -ti:5002 | xargs kill -9
+> ```
+
+### Step 4: Start fact-checking
+
+1. Pick a source from the dropdown (YouTube, Google Meet, local file, or live stream)
+2. Paste the URL or file path
+3. Click **Start Fact-Checking**
+4. Play the video/audio in your browser
+
+When you click Start, the app automatically:
+- Starts the backend server on port 5002
+- Launches the capture client
+- Connects to the live transcription stream
+- Begins fact-checking every 20 seconds
+
+Alerts start appearing after 30-60 seconds.
+
+### Step 5: Stop
+
+Click **Stop Fact-Checking** in the popup to end the session. To quit the app entirely, click the **X** button or **Quit** at the bottom.
+
+## How It Works
+
+```
+ Your Audio (YouTube, Meet, etc.)
+        |
+        v
+ VideoDB Capture (records system audio)
+        |
+        v
+ Real-time Transcription (WebSocket)
+        |
+        v
+ Transcript Buffer (collects ~20 seconds of text)
+        |
+        v
+ Gemini AI (extracts claims, checks facts, scores confidence)
+        |
+        v
+ Alerts (displayed in the tray app + saved to log files)
+```
+
+Every 20 seconds, the system:
+1. Collects all transcribed text
+2. Sends it to Gemini AI for fact-checking
+3. Labels each claim as **Verified**, **Misleading**, or **Needs Context**
+4. Shows high-confidence results in the app
+
+## Alert Types
+
+| Color | Label | Meaning |
+|-------|-------|---------|
+| Green | Verified | The claim is factually accurate |
+| Red | Misleading | The claim contains inaccuracies |
+| Orange | Needs Context | The claim is partially true but missing important context |
+
+## Desktop App Features
+
+- **Activity indicators** -- see live status for audio capture, transcription, and fact-checking
+- **Copy to clipboard** -- hover over any alert and click the copy icon
+- **Stats footer** -- running totals for verified, misleading, and needs-context notes
+- **Auto-reconnect** -- if the connection drops, the app reconnects automatically
+- **Session recovery** -- reopen the popup anytime without losing your session
+
+## CLI Usage (Alternative)
+
+If you prefer the terminal over the desktop app, you can run the backend and client separately. This requires **two terminal windows**.
+
+### Step 1: Install dependencies
 
 ```bash
 cd apps/fact-detector
-
 python3 -m venv venv
 source venv/bin/activate
-
-pip install -r requirements.txt
+pip install -r requirements.txt \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/
 ```
 
-### Capture Binary (macOS)
+> **Note:** The `videodb[capture]` package is hosted on TestPyPI, which is why the extra index flags are needed.
 
-The capture binary is included in the `amd_mx/` directory. After creating your virtual environment, register it with the SDK:
-
-```bash
-SITE_PACKAGES=$(python -c "import site; print(site.getsitepackages()[0])")
-mkdir -p "$SITE_PACKAGES/videodb_capture_bin"
-cat > "$SITE_PACKAGES/videodb_capture_bin/__init__.py" << 'EOF'
-import os
-_BINARY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "amd_mx")
-_BINARY_DIR = os.path.normpath(_BINARY_DIR)
-def get_binary_path():
-    return os.path.join(_BINARY_DIR, "recorder")
-EOF
-```
-
-If macOS blocks the binary, remove the quarantine flag:
-
-```bash
-xattr -d com.apple.quarantine amd_mx/recorder
-xattr -d com.apple.quarantine amd_mx/librecorder.dylib
-```
-
-### Environment Variables
+### Step 2: Set up your API keys
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your API keys:
+Open `.env` in any text editor and add your keys:
 
 ```
-VIDEO_DB_API_KEY=your_videodb_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
+VIDEO_DB_API_KEY=your_videodb_key_here
+GEMINI_API_KEY=your_gemini_key_here
 ```
 
-See [Configuration](#configuration) for optional settings.
-
-## How to Run
-
-You need two terminal windows.
-
-### Terminal 1: Start the backend
+### Step 3: Start the backend (Terminal 1)
 
 ```bash
 cd apps/fact-detector
@@ -141,9 +159,18 @@ source venv/bin/activate
 python backend.py
 ```
 
-Wait until you see `[READY] Now start the client`.
+Wait until you see this message:
 
-### Terminal 2: Start the capture client
+```
+[READY] Backend running on http://localhost:5002
+[READY] Now start the client:  python client.py
+```
+
+**Do not close this terminal.** The backend must stay running.
+
+### Step 4: Start the client (Terminal 2)
+
+Open a **new** terminal window:
 
 ```bash
 cd apps/fact-detector
@@ -151,7 +178,7 @@ source venv/bin/activate
 python client.py
 ```
 
-The client shows an interactive menu:
+You'll see a menu:
 
 ```
 What do you want to fact-check?
@@ -164,27 +191,22 @@ What do you want to fact-check?
 Enter choice (1/2/3/4):
 ```
 
-After you select a source, the content opens automatically and capture begins. The client will request microphone and screen capture permissions.
+Pick a source, paste the URL, and the video opens automatically. Make sure to play the video.
 
-### Stop
+### Step 5: Stop
 
-Press `Ctrl+C` in the client terminal. The backend will flush remaining transcript, run a final check, and print a session summary.
+Press `Ctrl+C` in the client terminal (Terminal 2). The backend will finish processing and print a summary.
 
 ## Example Output
 
 ```
-  [TRANSCRIPT] the great wall of china is visible from space with the naked eye
-  [TRANSCRIPT] india's population surpassed china's in 2023
-
-[ANALYZING] Processing 42 words of transcript...
-
 ============================================================
   COMMUNITY NOTES  (2 note(s) from latest check)
 ============================================================
 
   [MISLEADING] "The Great Wall of China is visible from space"
-  Note: The Great Wall is not visible to the naked eye from low Earth
-        orbit. This is a common misconception.
+  Note: The Great Wall is not visible to the naked eye from low
+        Earth orbit. This is a common misconception.
   Sources: NASA.gov
   Confidence: high
 
@@ -194,62 +216,121 @@ Press `Ctrl+C` in the client terminal. The backend will flush remaining transcri
   Confidence: high
 
 ------------------------------------------------------------
-  Session: 2 notes | Verified: 1 | Misleading: 1 | Needs Context: 0
+  Session: 2 notes | Verified: 1 | Misleading: 1
 ------------------------------------------------------------
 ```
 
-Notes with medium or low confidence are logged to `logs/` but not displayed in the terminal.
-
-## Log Files
-
-Each fact-check cycle writes a JSON file to `logs/`:
-
-```json
-{
-  "timestamp": "2025-01-15T10:03:34.510282+00:00",
-  "type": "fact_check",
-  "transcript_chunk": "...",
-  "context_used": "...",
-  "notes": [
-    {
-      "claim": "...",
-      "label": "misleading",
-      "confidence": "high",
-      "note": "...",
-      "sources": ["..."],
-      "alerted": true
-    }
-  ],
-  "summary": {
-    "total": 2,
-    "alerted": 1,
-    "verified": 1,
-    "misleading": 1,
-    "needs_context": 0
-  }
-}
-```
-
-A session summary file is written when the session stops, with aggregate statistics including suppressed note counts.
-
 ## Configuration
 
-Set these in `.env` or as environment variables:
+All settings go in the `.env` file. Only the API keys are required -- everything else has sensible defaults.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VIDEO_DB_API_KEY` | (required) | VideoDB API key |
-| `GEMINI_API_KEY` | (required) | Gemini API key |
-| `PORT` | `5002` | Backend server port |
-| `FACT_CHECK_INTERVAL` | `20` | Seconds between fact-check cycles |
-| `MIN_WORDS_FOR_CHECK` | `15` | Minimum words before triggering a check |
-| `CONFIDENCE_THRESHOLD` | `high` | Minimum confidence to show as terminal alert |
-| `CONTEXT_WINDOW_WORDS` | `150` | Words of prior transcript carried as context |
-| `ALERT_COOLDOWN_SECONDS` | `30` | Seconds between alerts for similar claims |
+| Setting | Default | What it does |
+|---------|---------|--------------|
+| `VIDEO_DB_API_KEY` | *(required)* | Your VideoDB API key |
+| `GEMINI_API_KEY` | *(required)* | Your Gemini API key |
+| `PORT` | `5002` | Port for the backend server |
+| `FACT_CHECK_INTERVAL` | `20` | How often to check facts (in seconds) |
+| `MIN_WORDS_FOR_CHECK` | `15` | Minimum words needed before running a check |
+| `CONFIDENCE_THRESHOLD` | `high` | Only show alerts at this confidence level or above |
+| `CONTEXT_WINDOW_WORDS` | `150` | How many words of previous context to carry forward |
+| `ALERT_COOLDOWN_SECONDS` | `30` | Minimum gap between alerts for similar claims |
+
+## Project Structure
+
+```
+apps/fact-detector/
+  backend.py          # Backend server (Flask) -- handles sessions, transcription, fact-checking
+  client.py           # Capture client -- records system audio and streams it
+  config.py           # All configuration settings
+  pipeline/           # Fact-checking pipeline modules
+    __init__.py       #   Orchestrator: preprocess -> verify -> generate -> filter
+    claim_detector.py #   Cleans transcript, manages context window
+    verifier.py       #   Gemini API: extracts and verifies claims
+    note_generator.py #   Formats results into community notes
+    alert_manager.py  #   Confidence filtering, dedup, throttling
+  logs/               # JSON log files (one per check cycle)
+
+apps/electron/fact-detector/
+  frontend/
+    main.js           # Electron main process: tray, window, process management
+    preload.js        # Secure bridge between Electron and the UI
+    index.html        # The popup UI (HTML + CSS + JS in one file)
+  scripts/
+    setup.sh          # First-time setup script
+    start.sh          # Launch script (checks deps, starts Electron)
+  package.json        # Node.js project config and scripts
+```
+
+## API Endpoints
+
+The backend runs on `http://localhost:5002` and exposes these endpoints:
+
+| Endpoint | Method | What it does |
+|----------|--------|--------------|
+| `/health` | GET | Check if the backend is running |
+| `/status` | GET | Backend readiness + tunnel URL |
+| `/stats` | GET | Session statistics (note counts) |
+| `/events` | GET | Live alert stream (Server-Sent Events) |
+| `/init-session` | POST | Create a new capture session |
+| `/callback` | POST | Webhook receiver for VideoDB events |
+
+Test the live alert stream:
+
+```bash
+curl -N http://localhost:5002/events
+```
+
+## Troubleshooting
+
+### "No alerts yet" after starting
+
+This is normal for the first 30-60 seconds. The system needs time to:
+1. Start audio capture
+2. Accumulate enough transcript (at least 15 words)
+3. Send it to Gemini for analysis
+
+Make sure your video is **actually playing with audio**.
+
+### Port 5002 is already in use
+
+Another process is using the port. Kill it first:
+
+```bash
+lsof -ti:5002 | xargs kill -9
+```
+
+Then start the app again.
+
+### macOS blocks the capture binary
+
+The capture binary is installed via the `videodb-capture-bin` pip package. If macOS blocks it, find and unquarantine it:
+
+```bash
+RECORDER=$(python -c "import videodb_capture_bin; print(videodb_capture_bin.get_binary_path())")
+xattr -d com.apple.quarantine "$RECORDER"
+```
+
+### WebSocket keeps disconnecting
+
+The app automatically retries up to 5 times. If it still fails:
+- Check your internet connection
+- Verify your `VIDEO_DB_API_KEY` is valid
+- Restart the app
+
+### Backend won't start
+
+Make sure both API keys are set in `.env`:
+```
+VIDEO_DB_API_KEY=...
+GEMINI_API_KEY=...
+```
+
+The backend exits immediately if either key is missing.
 
 ## Built With
 
 - [VideoDB Capture](https://github.com/video-db/videodb-capture-quickstart) -- System audio capture and real-time transcription
-- [Gemini AI](https://ai.google.dev/gemini-api/docs/libraries) (`google-genai` SDK) -- Claim extraction, verification, and confidence scoring
+- [Gemini AI](https://ai.google.dev/gemini-api/docs/libraries) -- Claim extraction, verification, and confidence scoring
 - [Flask](https://flask.palletsprojects.com) -- Backend server
+- [Electron](https://www.electronjs.org) -- Desktop tray app
 - [pycloudflared](https://github.com/6abd/pycloudflared) -- Webhook tunneling

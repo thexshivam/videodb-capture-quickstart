@@ -56,15 +56,12 @@ class AlertManager:
 
         # Deduplication
         fp = _normalize(note.get("claim", ""))
+        if not fp:
+            return False
         if fp in self._seen:
             elapsed = now - self._seen[fp]
             if elapsed < ALERT_COOLDOWN_SECONDS:
                 return False
-
-        # Throttle: at least ALERT_COOLDOWN_SECONDS between any alerts
-        if now - self._last_alert_time < ALERT_COOLDOWN_SECONDS:
-            # Still allow, but mark seen — throttle is soft
-            pass
 
         self._seen[fp] = now
         self._last_alert_time = now

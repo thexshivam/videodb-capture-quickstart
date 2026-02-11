@@ -86,7 +86,7 @@ def init_session():
     """Request the backend to create a capture session."""
     try:
         print(f"[INIT] Connecting to backend at {BACKEND_URL}...")
-        resp = requests.post(f"{BACKEND_URL}/init-session", json={}, timeout=10)
+        resp = requests.post(f"{BACKEND_URL}/init-session", json={}, timeout=30)
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
@@ -102,8 +102,7 @@ async def run_capture(token, session_id):
     """Run the CaptureClient to stream system audio for fact-checking."""
     print("\n[CAPTURE] Starting Capture Client...")
 
-    client = CaptureClient(client_token=token)
-
+    client = None
     stop_event = asyncio.Event()
     cleanup_done = asyncio.Event()
 
@@ -119,6 +118,7 @@ async def run_capture(token, session_id):
             pass
 
     try:
+        client = CaptureClient(client_token=token)
         # Request OS permissions
         print("[CAPTURE] Requesting permissions...")
         await client.request_permission("microphone")

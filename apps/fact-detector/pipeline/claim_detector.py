@@ -35,8 +35,8 @@ def _clean(text):
     text = text.strip()
     # Collapse multiple spaces/newlines into single space
     text = re.sub(r"\s+", " ", text)
-    # Remove common filler artifacts
-    text = re.sub(r"\b(um|uh|ah|er|hmm)\b", "", text, flags=re.IGNORECASE)
+    # Remove common filler artifacts (standalone only, surrounded by spaces or at edges)
+    text = re.sub(r"(?<!\w)(um|uh|ah|er|hmm)(?!\w)", "", text, flags=re.IGNORECASE)
     # Clean up any double spaces left after removal
     text = re.sub(r"  +", " ", text).strip()
     return text
