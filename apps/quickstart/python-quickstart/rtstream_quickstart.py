@@ -128,41 +128,32 @@ async def listen_ws(ws):
         traceback.print_exc()
 
 
-def interactive_search(audio_stream, screen_stream):
-    """Interactive search over indexed audio and visual content."""
+def interactive_search(screen_stream):
+    """Interactive search over indexed visual content."""
     header("Search Indexed Content")
-    print(f"  {DIM}Search audio and visual indexes built during this session.{RESET}")
-    print(f"  {DIM}Press Enter with empty query to exit search.{RESET}\n")
-
+    print(f"  {DIM}Search the visual index built during this session.{RESET}")
     while True:
         try:
-            query = input(f"  {CYAN}search:{RESET} ").strip()
+            query = input(f"  {CYAN}search (empty to exit):{RESET} ").strip()
             if not query:
                 break
 
-            for label, stream in [("AUDIO", audio_stream), ("VISUAL", screen_stream)]:
-                print(f"\n  {DIM}Searching {label.lower()} index...{RESET}")
-                try:
-                    results = stream.search(query=query, result_threshold=5)
-                    shots = results.get_shots()
-                except Exception as e:
-                    print(f"  {RED}{label} search error: {e}{RESET}")
-                    continue
+            print(f"\n  {DIM}Searching...{RESET}")
+            results = screen_stream.search(query=query, result_threshold=5)
+            shots = results.get_shots()
 
-                if shots:
-                    print(f"  {GREEN}{BOLD}{label} — {len(shots)} result(s):{RESET}\n")
-                    for i, shot in enumerate(shots, 1):
-                        score = f"score={shot.search_score:.2f}" if shot.search_score else ""
-                        print(f"  {BOLD}{i}.{RESET} [{shot.start:.0f}s - {shot.end:.0f}s]  {DIM}{score}{RESET}")
-                        print(f"     {shot.text}")
-                        shot.generate_stream()
-                        if shot.player_url:
-                            print(f"     {DIM}player: {shot.player_url}{RESET}")
-                        print()
-                else:
-                    print(f"  {DIM}{label} — no results.{RESET}")
-
-            print()
+            if shots:
+                print(f"  {GREEN}{BOLD}Found {len(shots)} result(s):{RESET}\n")
+                for i, shot in enumerate(shots, 1):
+                    score = f"score={shot.search_score:.2f}" if shot.search_score else ""
+                    print(f"  {BOLD}{i}.{RESET} [{shot.start:.0f}s - {shot.end:.0f}s]  {DIM}{score}{RESET}")
+                    print(f"     {shot.text}")
+                    shot.generate_stream()
+                    if shot.stream_url:
+                        print(f"     {DIM}player: http://console.videodb.io/player?url={shot.stream_url}{RESET}")
+                    print()
+            else:
+                print(f"  {DIM}No results.{RESET}\n")
 
         except Exception as e:
             print(f"  {RED}Search error: {e}{RESET}\n")
@@ -286,7 +277,7 @@ async def main():
         task.cancel()
 
     # Interactive search over indexed content
-    interactive_search(audio_stream, screen_stream)
+    interactive_search(screen_stream)
 
     # Cleanup
     header("Cleanup")
