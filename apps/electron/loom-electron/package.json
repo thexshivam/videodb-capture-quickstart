@@ -1,16 +1,18 @@
 {
   "name": "async-recorder",
   "version": "1.4.8",
-  "description": "A sample Electron application for screen and camera recording using VideoDB Recorder SDK",
-  "main": "main.js",
+  "description": "A sample Electron application for screen and camera recording using VideoDB Capture SDK",
+  "main": "frontend/main.js",
   "scripts": {
-    "setup": "./scripts/setup.sh",
-    "start": "./scripts/start-server.sh",
+    "setup": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\setup.bat':'./scripts/setup.sh',{stdio:'inherit'})\"",
+    "start": "node -e \"require('child_process').execSync(process.platform==='win32'?'scripts\\\\start-server.bat':'./scripts/start-server.sh',{stdio:'inherit'})\"",
+    "setup:win": "scripts\\setup.bat",
+    "setup:unix": "./scripts/setup.sh",
+    "start:win": "scripts\\start-server.bat",
+    "start:unix": "./scripts/start-server.sh",
     "electron": "electron .",
     "dist": "electron-builder",
-    "pack": "electron-builder --dir",
-    "reset-permissions": "bash scripts/reset-permissions.sh",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pack": "electron-builder --dir"
   },
   "keywords": [],
   "author": "VideoDB",
@@ -24,11 +26,7 @@
     "appId": "com.videodb.async-recorder",
     "productName": "Async Recorder",
     "files": [
-      "main.js",
-      "renderer.js",
-      "preload.js",
-      "index.html",
-      "config.json",
+      "frontend/**/*",
       "package.json",
       "resources/**/*",
       "node_modules/videodb/**/*"

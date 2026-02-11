@@ -41,8 +41,10 @@ echo "📦 Installing Python dependencies..."
 "$VENV_DIR/bin/pip" install -r "$SERVER_DIR/requirements.txt" --quiet
 
 # Install videodb from TestPyPI (pre-release SDK with capture support)
+# --no-cache-dir ensures we always get the latest version from TestPyPI
 echo "📦 Installing VideoDB SDK from TestPyPI..."
-"$VENV_DIR/bin/pip" install "videodb==0.4.1" \
+"$VENV_DIR/bin/pip" install "videodb==0.4.3" \
+    --no-cache-dir \
     --index-url https://test.pypi.org/simple/ \
     --extra-index-url https://pypi.org/simple/ \
     --quiet

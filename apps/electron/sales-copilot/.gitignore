@@ -1,24 +1,39 @@
-# Credentials and Config
-.env
-config.json
-
 # Dependencies
 node_modules/
-venv/
 
-# Build
-build/
+# Build output
 dist/
+release/
+
+# Database
+data/
+*.db
+
+# Drizzle
+drizzle/
+
+# Logs
+logs/
+*.log
+
+# OS files
 .DS_Store
+Thumbs.db
 
-# Runtime / Local
-runtime.json
-users.db
-server/venv/
-__pycache__/
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
-# Runtime / Local
-runtime.json
-users.db
-server/venv/
-__pycache__/
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config files with secrets
+config.json
+auth_config.json
+
+# TypeScript cache
+*.tsbuildinfo
