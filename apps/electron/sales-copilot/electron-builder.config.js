@@ -112,7 +112,7 @@ const config = {
     },
   },
   dmg: {
-    title: 'Sales Copilot ${version}',
+    title: 'Sales Copilot ${version}-${arch}',
     icon: 'resources/icon.icns',
     window: {
       width: 540,
