@@ -11,7 +11,7 @@
 ---
 
 ## Demo
-[![Watch the Video](https://github.com/user-attachments/assets/54a1427f-894a-4ede-9848-cc294ca96ee9)](https://dseetlpshk2tb.cloudfront.net/v3/published/manifests/924237f8-7732-4153-a927-8e319555d352.m3u8)
+[![Watch the Video](https://github.com/user-attachments/assets/54a1427f-894a-4ede-9848-cc294ca96ee9)](https://stream.videodb.io/v3/published/manifests/bff3a3ae-6827-4c31-9c56-d1c42f9deb33.m3u8)
 
 
 ## Download
