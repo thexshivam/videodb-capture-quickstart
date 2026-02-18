@@ -2,6 +2,8 @@
 
 A Loom-style screen recording app built with Electron and the VideoDB Capture SDK.
 
+> **Platform Support**: Currently available for macOS — Windows and Linux support coming soon
+
 ## Features
 
 - Screen + microphone + system audio capture
@@ -74,4 +76,4 @@ npm run setup && npm start
 
 ## License
 
-MIT
+[MIT](examples/async-recorder/LICENSE)

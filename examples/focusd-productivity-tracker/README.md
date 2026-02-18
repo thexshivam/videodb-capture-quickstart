@@ -12,6 +12,10 @@
   <a href="https://artifacts.videodb.io/focusd-productivity-tracker/focusd-productivity-tracker-latest.dmg">Download for macOS</a>
 </p>
 
+<p align="center">
+  <em>Currently available for macOS — Windows and Linux support coming soon</em>
+</p>
+
 ---
 
 ## Installation (Pre-built App)
@@ -45,39 +49,7 @@ At any point during the day you can:
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Capture["Capture Layer"]
-        REC["VideoDB Capture SDK"]
-        MIC["Mic / System Audio"]
-        SCR["Screen"]
-    end
-
-    subgraph Pipeline["Summarization Pipeline"]
-        L0["L0: Raw Events<br/>screen index every ~3s"]
-        L1["L1: Activity Segments<br/>grouped by time window"]
-        L2["L2: Micro-Summaries<br/>1-sentence per segment"]
-        L3["L3: Session Summaries<br/>projects, apps, productivity"]
-        L4["L4: Daily Summary<br/>headline, highlights, suggestions"]
-    end
-
-    subgraph UI["Electron UI"]
-        TL[Timeline View]
-        DD[Drill Down]
-        DASH[Dashboard]
-        RPT[Reports]
-    end
-
-    subgraph Store["Local Storage"]
-        DB[(SQLite)]
-    end
-
-    REC --> MIC & SCR
-    MIC & SCR -->|media streams| L0
-    L0 --> L1 --> L2 --> L3 --> L4
-    L2 & L3 & L4 --> DB
-    DB --> TL & DD & DASH & RPT
-```
+![Focusd Architecture](../../assets/focusd-architecture.png)
 
 ## How summarization works
 

@@ -4,6 +4,10 @@
   Real-time AI sales call assistant with live transcription, sentiment analysis, cue cards, and post-call summaries — powered by <a href="https://videodb.io">VideoDB</a>.
 </p>
 
+<p align="center">
+  <em>Currently available for macOS — Windows and Linux support coming soon</em>
+</p>
+
 ---
 
 ![Sales Copilot](screenshot.png)
@@ -62,49 +66,7 @@ Sales Copilot records your sales calls and provides real-time coaching while you
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Capture["Recording Layer"]
-        MIC["Mic (You)"]
-        SYS["System Audio (Customer)"]
-        SCR["Screen"]
-    end
-
-    subgraph VDB["VideoDB Cloud"]
-        CAP[Capture Session]
-        RTS[RTStreams]
-        TR[Transcription]
-    end
-
-    subgraph Backend["Main Process"]
-        WH[Webhook Handler]
-        TB[Transcript Buffer]
-        CM[Context Manager]
-
-        subgraph Copilot["Parallel Copilot Pipeline"]
-            SA[Sentiment Analyzer]
-            CC[Cue Card Engine]
-            NE[Nudge Engine]
-            PT[Playbook Tracker]
-            MET[Conversation Metrics]
-        end
-
-        SG[Summary Generator]
-    end
-
-    subgraph UI["React Frontend"]
-        TRANS[Live Transcript]
-        COP[Copilot Panel]
-        SUM[Call Summary]
-    end
-
-    MIC & SYS & SCR --> CAP --> RTS --> TR
-    TR -->|WebSocket + Webhook| WH --> TB --> CM
-    CM --> SA & CC & NE & PT & MET
-    SA & CC & NE & PT & MET --> COP
-    TB -->|on call end| SG --> SUM
-    TB --> TRANS
-```
+![Sales Copilot Architecture](../../assets/meeting-copilot-architecture.png)
 
 ## How the Copilot Works
 

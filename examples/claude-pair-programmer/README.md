@@ -1,191 +1,168 @@
-<h1 align="center">Pair Programmer</h1>
+<h1 align="center">Claude Pair Programmer</h1>
 
 <p align="center">
-  AI pair programming with real-time screen and audio context — powered by <a href="https://videodb.io">VideoDB</a> and <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a>.
+  Official repository: <a href="https://github.com/video-db/claude-code/tree/main/plugins/pair-programmer">github.com/video-db/claude-code/plugins/pair-programmer</a>
+</p>
+
+<p align="center">
+  Give Claude Code eyes and ears — perception for real-time screen vision, voice, and audio understanding.
 </p>
 
 ---
 
-## Overview
+## 🔌 Installation
 
-Pair Programmer turns Claude Code into a context-aware assistant that can see your screen and hear your audio in real-time. An Electron-based recorder runs in the background, captures your display, microphone, and system audio, and streams everything to VideoDB for indexing. Claude Code reads the indexed context on demand through slash commands, so it always knows what you're looking at, what you just discussed, and what happened in the last few minutes.
+```bash
+# Add VideoDB marketplace (one-time)
+/plugin marketplace add video-db/claude-code
 
-The recorder exposes a local HTTP API that Claude Code talks to via hooks and commands. A Cloudflare tunnel is automatically created so VideoDB can deliver webhooks back to your machine. No manual ngrok setup required.
+# Install Pair Programmer
+/plugin install pair-programmer@videodb
+
+# Configure with your VideoDB API key
+/pair-programmer:record-config
+```
+
+**Control from MacOS Tray Menu** (System Tray Icon) after installation.
+
+---
+
+## Why Build This?
+
+**The Problem**: Traditional AI coding assistants are context-blind. When you code with Claude Code, you're constantly copy-pasting screenshots, describing what's on screen, and repeating yourself. Context switching breaks your flow.
+
+**The Solution**: Pair Programmer gives Claude Code perception — eyes to see your screen, ears to hear your voice and system audio, and memory to track context automatically.
+
+Like a programmer sitting next to you who sees your terminal errors, hears your questions, and remembers recent context without you repeating anything.
+
+---
+
+## What Is This?
+
+A perception layer for Claude Code that streams your screen, microphone, and system audio to VideoDB's capture SDK, runs real-time AI indexing, and feeds context directly into Claude Code.
+
+### Core Capabilities
+
+- **👁️ Screen Vision**: Real-time visual indexing with AI-generated scene descriptions. Semantic search across screen history.
+- **👂 Voice Hearing**: Live microphone transcription with intent classification (question, command, thinking aloud).
+- **🔊 Audio Awareness**: System audio capture (meetings, tutorials) with source classification and summarization.
+- **🧠 Context Continuity**: FIFO buffers keep last N items in memory. Claude remembers recent context automatically.
+
+---
 
 ## How It Works
 
-1. **Session hook starts the recorder** — When you open Claude Code in the project directory, a session hook (`ensure-recorder.sh`) checks config and starts the Electron recorder process if needed.
-2. **`/record` begins capture** — The slash command calls the recorder's HTTP API to start a VideoDB capture session with mic, system audio, and display channels.
-3. **Webhooks activate AI pipelines** — VideoDB sends a `capture_session.active` webhook. The recorder starts transcript, visual indexing, and audio indexing on each RTStream.
-4. **Context buffers fill in real-time** — Indexed events (screen descriptions, transcripts, audio summaries) arrive via WebSocket and are stored in FIFO context buffers.
-5. **`/refresh-context` or `/what-happened` reads the buffer** — Claude Code fetches the latest context from the recorder's HTTP API and builds a timestamped summary.
-6. **`Cmd+Shift+A` triggers instant answers** — A global keyboard shortcut spawns a `/trigger` command that reads context and shows the answer in an always-on-top overlay, without interrupting your workflow.
+1. **Start recording** via `/pair-programmer:record` — continuously captures screen, mic, and system audio in the background
+2. **Context buffers** fill up automatically as you work (last 50 items by default)
+3. **Trigger AI analysis** anytime via keyboard shortcut (`Cmd+Shift+A` by default) or `/pair-programmer:cortex`
+4. **Multi-agent system** analyzes buffered context:
+   - **cortex** — Orchestrator that correlates reports and synthesizes answers
+   - **code-eye** — Reads visual screen context (files, errors, activities)
+   - **voice** — Classifies speech intent and extracts keywords
+   - **hearing** — Classifies system audio source
+   - **narrator** — Shows status and responses in overlay
+5. **Answer appears** in always-on-top overlay window with analysis and suggestions
 
-## Architecture
+No copy-pasting. No context switching. Just keep working and ask when you need help.
 
-```mermaid
-flowchart LR
-    subgraph Claude["Claude Code"]
-        CC[Slash Commands]
-        HK[Session Hooks]
-    end
+---
 
-    subgraph Recorder["Electron Recorder"]
-        API[HTTP API :8899]
-        REC[CaptureClient]
-        CTX[Context Buffers]
-        OVL[Overlay Window]
-    end
+## Features
 
-    subgraph VDB["VideoDB Cloud"]
-        SM[Session Manager]
-        RT[RTStreams]
-        AI[AI Processing]
-    end
+**Recording & Streaming**
+- Real-time screen, mic, and system audio capture via VideoDB SDK
+- Multi-channel streaming with AI visual indexing, transcription, and audio summarization
+- FIFO context buffers (default 50 items each)
 
-    TUN[Cloudflare Tunnel]
+**Multi-Agent System**
+- Parallel sense agents report independently to orchestrator
+- Adaptive reading strategies based on context size
+- Semantic search across rtstream history
 
-    HK -->|ensure running| API
-    CC -->|start/stop/context| API
-    API --> REC -->|media streams| RT
-    SM -->|webhooks| TUN --> API
-    API -->|start indexing| RT --> AI
-    AI -->|WebSocket events| CTX
-    CC -->|read context| CTX
-    CC -->|show answer| OVL
-```
+**Control Interfaces**
+- **MacOS Tray Menu**: Start/stop recording, show/hide overlay
+- **CLI Commands**: Slash commands for config, status, search
+- **Keyboard shortcut**: Configurable trigger for AI analysis (default `Cmd+Shift+A`)
+- **Overlay Window**: Always-on-top responses and loading states
 
-## Tech Stack
+**Session Features**
+- Cloudflare tunnel for webhook delivery
+- Exported video saved to your VideoDB account
 
-| Component | Version | Purpose |
-|-----------|---------|---------|
-| Electron | 28 | Desktop application shell |
-| Node.js | 18+ | JavaScript runtime |
-| VideoDB SDK | Latest | Screen capture and AI indexing |
-| Cloudflare Tunnel | Latest | Webhook delivery to localhost |
+---
 
-## Slash Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `/record` | Start or stop a recording session. Runs `/record-config` first if setup is incomplete. |
-| `/record-status` | Show current recording state, active channels, RTStream IDs, and buffer sizes. |
-| `/refresh-context` | Fetch the latest screen, mic, and audio context and display a timestamped timeline. |
-| `/what-happened` | Fetch context and provide an analysis with timeline, key actions, current state, and notable items. |
-| `/record-config` | Set up or update your VideoDB API key, indexing prompts, and recorder settings. |
-| `/trigger` | Activated by the global shortcut (`Cmd+Shift+A`). Reads context, analyzes it, and shows the answer in the overlay. |
+| `/pair-programmer:record` | Start or stop recording (opens source picker on first start) |
+| `/pair-programmer:record-config` | Configure API key, buffer sizes, prompts, keyboard shortcut |
+| `/pair-programmer:record-status` | Check recording state, rtstream IDs, buffer sizes |
+| `/pair-programmer:refresh-context` | Fetch current screen/mic/system_audio context |
+| `/pair-programmer:what-happened` | Summarize recent activity with timeline |
+| `/pair-programmer:cortex` | Trigger AI analysis of buffered context |
 
-## Prerequisites
+---
 
-- **Operating System**: macOS (Apple Silicon or Intel)
-- **Node.js**: 18 or higher
-- **npm**: 10 or higher
-- **Claude Code CLI**: [Install here](https://docs.anthropic.com/en/docs/claude-code)
-- **VideoDB API Key**: Sign up at [console.videodb.io](https://console.videodb.io)
+## Example Usage
 
-## Getting Started
+**Recording is active**, you're working on a migration that's failing. You verbally explain: "Why is this migration failing?"
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/video-db/videodb-capture-quickstart.git
-cd videodb-capture-quickstart/apps/claude/pair-programmer
+Trigger AI: Press keyboard shortcut (or run `/pair-programmer:cortex`) → Overlay shows "👀 Reading your screen & listening in..." → Agents analyze: terminal error + migration file + your speech → Overlay responds with diagnosis and fix suggestion.
 
-# 2. Open Claude Code
-claude
+Continue the conversation in the overlay or through Claude Code. Context from previous interactions is remembered.
 
-# 3. Configure your API key and settings
-/record-config
-
-# 4. Start recording
-/record
-```
-
-The `/record-config` command will prompt you for your VideoDB API key and save it locally. The recorder process starts automatically when you open Claude Code (via session hooks) or when you run `/record`.
+---
 
 ## Configuration
 
-Settings are stored in `.claude/skills/pair-programmer/config.json`. Key options:
+Access via `/pair-programmer:record-config`. Key settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `videodb_api_key` | — | Your VideoDB API key (stored locally, masked in output) |
-| `recorder_port` | `8899` | Port for the recorder's HTTP API |
-| `context_buffer_size_screen` | `50` | Max screen context entries to keep in memory |
-| `context_buffer_size_mic` | `50` | Max mic context entries |
-| `context_buffer_size_system_audio` | `50` | Max system audio context entries |
-| `assistant_shortcut` | `CommandOrControl+Shift+A` | Global keyboard shortcut for `/trigger` |
-| `visual_index.prompt` | Screen description prompt | What the vision model extracts from screen captures |
-| `visual_index.batch_time` | `2` | Seconds between visual index batches |
-| `system_audio_index.prompt` | Audio summary prompt | What the model extracts from system audio |
-| `mic_index.prompt` | Transcription prompt | What the model extracts from mic audio |
+| `videodb_api_key` | — | [Get your API key](https://console.videodb.io) |
+| `context_buffer_size_*` | `50` | Max entries per buffer (screen/mic/audio) |
+| `assistant_shortcut` | `CommandOrControl+Shift+A` | Global keyboard shortcut |
+| `visual_index.enabled` | `true` | Enable screen indexing |
+| `mic_index.enabled` | `true` | Enable microphone transcription |
+| `system_audio_index.enabled` | `true` | Enable system audio indexing |
 
-All indexing settings (prompts, batch timing, enable/disable) can be adjusted via `/record-config`.
+---
 
-## Project Structure
+## Requirements
 
-```
-apps/claude/pair-programmer/
-├── .claude/
-│   ├── settings.json              # Session hooks configuration
-│   ├── commands/
-│   │   ├── record.md              # /record command
-│   │   ├── record-config.md       # /record-config command
-│   │   ├── record-status.md       # /record-status command
-│   │   ├── refresh-context.md     # /refresh-context command
-│   │   ├── what-happened.md       # /what-happened command
-│   │   └── trigger.md             # /trigger command (shortcut)
-│   ├── hooks/
-│   │   ├── ensure-recorder.sh     # Auto-start recorder on session start
-│   │   ├── start-recorder.sh      # Manual recorder startup
-│   │   └── cleanup-recorder.sh    # Stop recorder on session end
-│   └── skills/
-│       └── pair-programmer/
-│           ├── skill.md            # HTTP API reference for Claude
-│           ├── config.json         # User configuration
-│           ├── package.json        # Dependencies (Electron 28, VideoDB SDK)
-│           ├── recorder-app.js     # Electron recorder application (1,671 lines)
-│           └── ui/
-│               ├── overlay.html    # Always-on-top overlay window
-│               └── picker.html     # Display/audio source picker
-├── .gitignore
-└── README.md
-```
+- **macOS 12+** (Monterey or later)
+- **Node.js 18+**
+- **Claude Code CLI** — [Install guide](https://docs.anthropic.com/en/docs/claude-code)
+- **VideoDB API Key** — [Sign up](https://console.videodb.io)
 
-## Permissions (macOS)
+**macOS Permissions** (System Settings > Privacy & Security):
+- ✅ Microphone Access
+- ✅ Screen Recording
+- ✅ System Audio Recording
+- ✅ Accessibility (optional, for overlay always-on-top)
 
-The recorder requires the following system permissions:
-- **Microphone Access** - For voice recording
-- **Screen Recording** - For screen capture
-- **System Audio Recording** - For capturing system audio
+---
 
-Grant these in **System Settings > Privacy & Security**.
+## MacOS Tray Integration
 
-## Troubleshooting
+After installation, a tray icon appears in your menu bar with options:
+- Start/Stop Recording
+- Show/Hide Overlay
+- Open Config
+- Quit
 
-### Recorder won't start
-- Check that Node.js 18+ is installed: `node --version`
-- Verify VideoDB API key is set: `/record-config`
-- Check for port conflicts on 8899: `lsof -i :8899`
+**Tip**: If the overlay blocks your work, hide it via tray menu. Recording continues in background. Use the keyboard shortcut or slash command to trigger analysis anytime.
 
-### No context appearing
-- Ensure recording is active: `/record-status`
-- Check that indexing pipelines are enabled in config
-- Wait 10-15 seconds for initial context to populate
+---
 
-### Overlay not showing
-- Verify keyboard shortcut isn't conflicting with other apps
-- Check System Settings > Privacy & Security > Accessibility permissions
-- Try changing the shortcut in `/record-config`
+## Community & Support
 
-### Cloudflare tunnel fails
-- The tunnel binary will auto-download on first run
-- Check internet connectivity
-- Manually verify tunnel status in recorder logs
+- **Plugin Issues**: [Claude Code Repository](https://github.com/video-db/claude-code/issues)
+- **VideoDB SDK Issues**: [VideoDB Capture Quickstart](https://github.com/video-db/videodb-capture-quickstart/issues)
+- **Documentation**: [docs.videodb.io](https://docs.videodb.io)
+- **Discord**: [Join community](https://discord.gg/py9P639jGz)
 
-## Data & Privacy
+---
 
-- Your **API key** is stored locally in `config.json` and never leaves your machine except to authenticate with VideoDB's API.
-- **Screen captures** are streamed to VideoDB for indexing, and indexed context is stored in ephemeral in-memory buffers on your machine.
-- **Context buffers** are FIFO queues — old entries are dropped as new ones arrive. Nothing is written to disk.
-- The recorder process runs locally and communicates with Claude Code over `localhost`.
-- A **Cloudflare tunnel** is created automatically for webhook delivery and is torn down when the recorder stops.
+<p align="center">Made with ❤️ by the <a href="https://videodb.io">VideoDB</a> team</p>
