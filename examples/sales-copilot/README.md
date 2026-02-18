@@ -10,6 +10,24 @@
 
 ---
 
+## Demo
+
+<p align="center">
+  <a href="http://console.videodb.io/player?url=https://dseetlpshk2tb.cloudfront.net/v3/published/manifests/924237f8-7732-4153-a927-8e319555d352.m3u8">
+    <img src="https://img.shields.io/badge/▶_Watch_Demo-blue?style=for-the-badge" alt="Watch Demo" />
+  </a>
+</p>
+
+<p align="center">
+  <iframe
+    src="http://console.videodb.io/player?url=https://dseetlpshk2tb.cloudfront.net/v3/published/manifests/924237f8-7732-4153-a927-8e319555d352.m3u8"
+    width="100%"
+    height="450"
+    style="max-width: 800px; border: none;"
+    allowfullscreen>
+  </iframe>
+</p>
+
 ![Sales Copilot](screenshot.png)
 
 ## Download
