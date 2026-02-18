@@ -7,6 +7,8 @@ import asyncio
 import traceback
 import time
 import json
+import secrets
+import hmac
 from datetime import datetime, timezone
 
 from flask import Flask, request, jsonify, Response
@@ -87,6 +89,25 @@ _sse_condition = threading.Condition()
 _last_transcript = ""
 _last_transcript_lock = threading.Lock()
 
+# Circuit breaker state for Gemini API failures
+_consecutive_failures = 0
+_current_chunk_retries = 0
+_circuit_open_until = 0.0  # timestamp
+MAX_CHUNK_RETRIES = 3
+MAX_CONSECUTIVE_FAILURES = 5
+CIRCUIT_OPEN_DURATION = 60
+
+# Session generation counter for atomic reset detection
+_session_generation = 0
+_session_gen_lock = threading.Lock()
+
+# Webhook callback authentication
+_callback_secret = None
+
+# Callback rate limiting (in-memory)
+_callback_counts = {}  # ip -> (count, window_start)
+CALLBACK_RATE_LIMIT = 60  # max requests per minute per IP
+
 
 def _buffer_transcript(text):
     """Append text to the transcript buffer, skipping duplicates."""
@@ -130,6 +151,19 @@ def log_to_file(entry):
         print(f"[LOG] Saved to {filename}")
     except OSError as e:
         logger.error("Failed to write log entry: %s", e)
+
+
+def _check_rate_limit(ip):
+    """Return True if the request is within rate limits, False otherwise."""
+    now = time.time()
+    count, start = _callback_counts.get(ip, (0, now))
+    if now - start > 60:
+        _callback_counts[ip] = (1, now)
+        return True
+    if count >= CALLBACK_RATE_LIMIT:
+        return False
+    _callback_counts[ip] = (count + 1, start)
+    return True
 
 
 def log_notes(all_notes, transcript_chunk, context_used):
@@ -209,7 +243,7 @@ def update_stats(all_notes, alerts):
 # Fact-Check Runner (background thread)
 def run_fact_check_loop():
     """Periodically drain the transcript buffer and run the pipeline."""
-    global pipeline_context
+    global pipeline_context, _consecutive_failures, _current_chunk_retries, _circuit_open_until
 
     logger.info(
         "Fact-check loop started (interval=%ds, min_words=%d)",
@@ -219,6 +253,15 @@ def run_fact_check_loop():
 
     while True:
         time.sleep(FACT_CHECK_INTERVAL)
+
+        # Circuit breaker: skip pipeline calls while circuit is open
+        if _circuit_open_until and time.time() < _circuit_open_until:
+            logger.debug("Circuit open — skipping pipeline call")
+            continue
+
+        # Capture session generation before draining buffer
+        with _session_gen_lock:
+            gen_before = _session_generation
 
         # Drain the buffer
         with buffer_lock:
@@ -248,12 +291,48 @@ def run_fact_check_loop():
                 chunk, ctx, verifier, alert_manager
             )
         except Exception as e:
-            logger.error("Pipeline error (will retry next cycle): %s", e)
+            logger.error("Pipeline error: %s", e)
             print(f"[ERROR] Pipeline failed: {e}")
-            # Put the chunk back so it's retried next cycle
-            with buffer_lock:
-                transcript_buffer.insert(0, chunk)
+
+            _consecutive_failures += 1
+            _current_chunk_retries += 1
+
+            if _current_chunk_retries >= MAX_CHUNK_RETRIES:
+                # Discard this chunk after too many retries
+                logger.warning(
+                    "Chunk discarded after %d retries", _current_chunk_retries
+                )
+                log_to_file({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "type": "discarded_chunk",
+                    "chunk": chunk[:500],
+                    "retries": _current_chunk_retries,
+                    "error": str(e),
+                })
+                _current_chunk_retries = 0
+            else:
+                # Re-insert chunk for retry
+                with buffer_lock:
+                    transcript_buffer.insert(0, chunk)
+
+            if _consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                _circuit_open_until = time.time() + CIRCUIT_OPEN_DURATION
+                logger.warning(
+                    "[CIRCUIT] Open — pausing pipeline for %ds", CIRCUIT_OPEN_DURATION
+                )
+
             continue
+
+        # Success: reset failure state
+        _consecutive_failures = 0
+        _current_chunk_retries = 0
+        _circuit_open_until = 0.0
+
+        # Check if session changed during pipeline run (stale result)
+        with _session_gen_lock:
+            if _session_generation != gen_before:
+                logger.info("Session changed during pipeline run, discarding results")
+                continue
 
         with context_lock:
             pipeline_context = new_context
@@ -364,7 +443,13 @@ def stats():
 @app.route("/init-session", methods=["POST"])
 def init_session():
     """Create a VideoDB capture session and return credentials."""
-    global pipeline_context, _last_transcript, _sse_event_id
+    global pipeline_context, _last_transcript, _sse_event_id, _callback_secret
+    global _consecutive_failures, _current_chunk_retries, _circuit_open_until
+    global _session_generation
+
+    # Increment session generation FIRST so the fact-check loop detects the reset
+    with _session_gen_lock:
+        _session_generation += 1
 
     # Reset all session state so stale data doesn't leak across sessions
     with buffer_lock:
@@ -381,10 +466,19 @@ def init_session():
     with _sse_events_lock:
         _sse_events.clear()
         _sse_event_id = 0
+
+    # Reset circuit breaker state for new session
+    _consecutive_failures = 0
+    _current_chunk_retries = 0
+    _circuit_open_until = 0.0
+
+    # Generate a new callback secret for this session
+    _callback_secret = secrets.token_urlsafe(32)
+
     logger.info("Session state reset for new session")
 
     try:
-        callback_url = f"{public_url}/callback"
+        callback_url = f"{public_url}/callback?token={_callback_secret}"
         logger.info("Creating session with callback: %s", callback_url)
 
         session = conn.create_capture_session(
@@ -409,6 +503,17 @@ def init_session():
 @app.route("/callback", methods=["POST"])
 def callback():
     """Handle VideoDB capture session lifecycle webhooks."""
+    # Validate callback token
+    token = request.args.get("token", "")
+    if not _callback_secret or not hmac.compare_digest(token, _callback_secret):
+        logger.warning("Unauthorized callback attempt from %s", request.remote_addr)
+        return jsonify({"error": "unauthorized"}), 403
+
+    # Rate limiting
+    if not _check_rate_limit(request.remote_addr):
+        logger.warning("Rate limit exceeded for %s", request.remote_addr)
+        return jsonify({"error": "rate limit exceeded"}), 429
+
     data = request.json
     event = data.get("event")
 

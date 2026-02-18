@@ -822,7 +822,7 @@
       </div>
       <div class="control-row">
         <label for="targetInput" id="targetLabel">URL</label>
-        <input type="text" id="targetInput" placeholder="https://youtube.com/watch?v=...">
+        <input type="text" id="targetInput" maxlength="2048" placeholder="https://youtube.com/watch?v=...">
       </div>
       <div class="control-row">
         <button class="btn btn-start" id="actionBtn" onclick="handleAction()">
@@ -1005,7 +1005,11 @@
     function validateTarget(source, target) {
       if (!target) return 'Please enter a URL or path for the source.';
       if (target.includes('\n') || target.includes('\r')) return 'Input cannot contain newlines.';
-      if (source === 'local') return null;
+      if (source === 'local') {
+        if (target.length > 1024) return 'Path is too long.';
+        if (target.includes('..')) return 'Path cannot contain ".." segments.';
+        return null;
+      }
       try {
         const url = new URL(target);
         if (!['http:', 'https:'].includes(url.protocol)) return 'URL must start with http:// or https://';

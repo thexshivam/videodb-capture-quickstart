@@ -61,6 +61,15 @@ Respond ONLY with a JSON array. Each element:
 If no verifiable factual claims exist, return: []"""
 
 
+def _is_safe_url(url):
+    """Reject non-HTTP URLs and suspiciously long URLs."""
+    if not isinstance(url, str):
+        return False
+    if len(url) > 2048:
+        return False
+    return url.startswith("https://") or url.startswith("http://")
+
+
 class Verifier:
     """Sends transcript text to Gemini for claim extraction, verification, and scoring."""
 
@@ -136,6 +145,7 @@ class Verifier:
                 sources = item.get("sources", [])
                 if not isinstance(sources, list):
                     sources = [str(sources)] if sources else []
+                sources = [s for s in sources if _is_safe_url(s)]
                 validated.append({
                     "claim": str(item["claim"]),
                     "label": label,

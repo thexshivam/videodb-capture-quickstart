@@ -631,13 +631,28 @@ ipcMain.handle('open-system-settings', (_event, type) => {
 // IPC handlers — session management
 // ---------------------------------------------------------------------------
 
+let _sessionOpInProgress = false;
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+    ),
+  ]);
+}
+
 ipcMain.handle('start-session', async (_event, { sourceType, target }) => {
+  if (_sessionOpInProgress) {
+    return { success: false, error: 'Operation already in progress' };
+  }
+  _sessionOpInProgress = true;
   try {
     const permsOk = await ensurePermissions();
     if (!permsOk) {
       return { success: false, error: 'Screen Recording permission required' };
     }
-    await startBackend();
+    await withTimeout(startBackend(), 60000, 'Backend startup');
 
     // Health check with retry before proceeding (Improvement 5)
     const healthy = await waitForBackendReady();
@@ -648,17 +663,26 @@ ipcMain.handle('start-session', async (_event, { sourceType, target }) => {
     if (!sseRequest) {
       connectSSE();
     }
-    await startClient(sourceType, target);
+    await withTimeout(startClient(sourceType, target), 120000, 'Client startup');
     isPaused = false;
     setTrayActive(true);
     return { success: true };
   } catch (err) {
+    // Clean up any partially-started resources
+    disconnectSSE();
+    await stopClient();
     logError('IPC', 'start-session error', err);
     return { success: false, error: err.message };
+  } finally {
+    _sessionOpInProgress = false;
   }
 });
 
 ipcMain.handle('stop-session', async () => {
+  if (_sessionOpInProgress) {
+    return { success: false, error: 'Operation already in progress' };
+  }
+  _sessionOpInProgress = true;
   try {
     isPaused = false;
     setTrayActive(false);
@@ -668,6 +692,8 @@ ipcMain.handle('stop-session', async () => {
   } catch (err) {
     logError('IPC', 'stop-session error', err);
     return { success: false, error: err.message };
+  } finally {
+    _sessionOpInProgress = false;
   }
 });
 
@@ -727,8 +753,16 @@ ipcMain.on('quit-app', () => {
 });
 
 ipcMain.on('open-external', (_event, url) => {
-  if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+  if (typeof url !== 'string' || url.length > 2048) return;
+  try {
+    const parsed = new URL(url);
+    // Only allow http/https, block localhost/private IPs
+    if (!['https:', 'http:'].includes(parsed.protocol)) return;
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.local')) return;
     shell.openExternal(url);
+  } catch {
+    // Invalid URL — ignore
   }
 });
 
