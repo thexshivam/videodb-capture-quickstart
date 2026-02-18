@@ -83,10 +83,9 @@ class Verifier:
         if not text:
             return []
 
-        prompt = EXTRACTION_PROMPT.format(
-            context=context if context else "(none)",
-            transcript=text,
-        )
+        prompt = EXTRACTION_PROMPT.replace(
+            "{context}", context if context else "(none)"
+        ).replace("{transcript}", text)
 
         try:
             response = self.client.models.generate_content(

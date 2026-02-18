@@ -128,6 +128,16 @@ function startBackend() {
     }
 
     const pythonPath = getPythonPath();
+
+    // Verify the venv python binary exists before attempting to spawn
+    if (!fs.existsSync(pythonPath)) {
+      const msg = `Python not found at ${pythonPath}. Run ./scripts/setup.sh first.`;
+      logError('BACKEND', msg);
+      sendErrorToRenderer('Setup required', msg);
+      reject(new Error(msg));
+      return;
+    }
+
     log('BACKEND', `Starting: ${pythonPath} backend.py`);
 
     backendProcess = spawn(pythonPath, ['backend.py'], {
@@ -751,11 +761,23 @@ function fetchJSON(url) {
 // App lifecycle
 // ---------------------------------------------------------------------------
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Stale process cleanup (Improvement 2)
   cleanupStaleProcesses();
 
-  // Hide dock icon (tray-only app)
+  // Request microphone permission BEFORE hiding dock — macOS requires a visible
+  // dock presence to reliably show the permission dialog on fresh installs.
+  if (process.platform === 'darwin') {
+    const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+    log('PERMISSIONS', `Microphone status at launch: ${micStatus}`);
+    if (micStatus !== 'granted') {
+      log('PERMISSIONS', 'Requesting microphone access (dock visible)...');
+      const granted = await systemPreferences.askForMediaAccess('microphone');
+      log('PERMISSIONS', `Microphone request result: ${granted ? 'granted' : 'denied'}`);
+    }
+  }
+
+  // Hide dock icon (tray-only app) — after permission dialog has been shown
   if (app.dock) {
     app.dock.hide();
   }

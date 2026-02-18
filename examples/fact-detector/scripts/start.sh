@@ -37,7 +37,12 @@ fi
 # Kill stale processes on port 5002
 if lsof -ti:5002 &>/dev/null; then
   echo "[CLEANUP] Killing stale process on port 5002..."
-  lsof -ti:5002 | xargs kill -9 2>/dev/null || true
+  lsof -ti:5002 | xargs kill -15 2>/dev/null || true
+  sleep 2
+  # Force kill if still alive
+  if lsof -ti:5002 &>/dev/null; then
+    lsof -ti:5002 | xargs kill -9 2>/dev/null || true
+  fi
 fi
 
 # Launch

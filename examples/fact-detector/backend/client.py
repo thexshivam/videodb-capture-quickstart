@@ -10,7 +10,9 @@ import webbrowser
 
 from videodb.capture import CaptureClient
 
-BACKEND_URL = "http://localhost:5002"
+from config import PORT
+
+BACKEND_URL = f"http://localhost:{PORT}"
 OPEN_DELAY_SECONDS = 3
 
 logging.basicConfig(level=logging.INFO)

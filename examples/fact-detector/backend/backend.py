@@ -364,6 +364,25 @@ def stats():
 @app.route("/init-session", methods=["POST"])
 def init_session():
     """Create a VideoDB capture session and return credentials."""
+    global pipeline_context, _last_transcript, _sse_event_id
+
+    # Reset all session state so stale data doesn't leak across sessions
+    with buffer_lock:
+        transcript_buffer.clear()
+        _recent_transcripts.clear()
+    with _last_transcript_lock:
+        _last_transcript = ""
+    with context_lock:
+        pipeline_context = ""
+    with stats_lock:
+        for key in session_stats:
+            session_stats[key] = 0
+    alert_manager.reset()
+    with _sse_events_lock:
+        _sse_events.clear()
+        _sse_event_id = 0
+    logger.info("Session state reset for new session")
+
     try:
         callback_url = f"{public_url}/callback"
         logger.info("Creating session with callback: %s", callback_url)

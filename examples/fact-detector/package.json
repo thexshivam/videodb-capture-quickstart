@@ -24,7 +24,6 @@
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
       "extendInfo": {
-        "LSUIElement": true,
         "NSMicrophoneUsageDescription": "Fact Detector needs microphone access to capture audio for real-time fact-checking.",
         "NSScreenCaptureUsageDescription": "Fact Detector needs screen recording access to capture system audio.",
         "NSCameraUsageDescription": "Fact Detector may use camera access for video capture."

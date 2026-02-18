@@ -11,9 +11,7 @@ import subprocess
 import sys
 
 import videodb
-from config import VIDEO_DB_API_KEY
-
-PORT = int(os.getenv("PORT", "5002"))
+from config import VIDEO_DB_API_KEY, PORT
 
 
 def kill_port(port):

@@ -42,6 +42,12 @@ class AlertManager:
         log_only = []
         now = time.time()
 
+        # Expire stale entries to prevent unbounded memory growth
+        expiry = 3 * ALERT_COOLDOWN_SECONDS
+        stale = [fp for fp, ts in self._seen.items() if now - ts > expiry]
+        for fp in stale:
+            del self._seen[fp]
+
         for note in notes:
             note_copy = dict(note)
             if self._should_alert(note_copy, now):

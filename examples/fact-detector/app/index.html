@@ -1459,6 +1459,10 @@
             startStatsPolling();
           }
           startTimestampUpdates();
+          // Hide empty state if alerts are already present
+          if (alertNotes.length > 0) {
+            emptyState.style.display = 'none';
+          }
         }
       } catch (e) {
         // Ignore — first load

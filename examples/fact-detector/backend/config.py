@@ -11,7 +11,11 @@ VIDEO_DB_API_KEY = os.getenv("VIDEO_DB_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Server
-PORT = int(os.getenv("PORT", "5002"))
+try:
+    PORT = int(os.getenv("PORT", "5002"))
+except ValueError:
+    print(f"[ERROR] Invalid PORT value: {os.getenv('PORT')!r} — must be a number. Falling back to 5002.")
+    PORT = 5002
 
 # Fact-check timing
 FACT_CHECK_INTERVAL = int(os.getenv("FACT_CHECK_INTERVAL", "20"))
