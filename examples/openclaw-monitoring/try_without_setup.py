@@ -1,15 +1,16 @@
 """
-RTStream Quickstart - Monitor an AI Agent via RTSP Streams
+Try Without Setup - Monitor a Live OpenClaw Agent Instantly
 
-Connects to two RTSP streams (audio + screen) from a Matrix Architect agent,
-starts real-time transcription, audio/visual indexing, and alerts (e.g. browser open),
-then prints all events via a single WebSocket (differentiated by channel).
+VideoDB hosts a live OpenClaw agent at matrix.videodb.io. This script connects
+directly to its RTSP streams (audio + screen), starts real-time transcription,
+audio/visual indexing, and alerts, then prints all events via WebSocket.
 Automatically stops after 5 minutes.
 
-No Capture SDK or desktop client needed - just RTSP URLs.
+No EC2 instance, no OpenClaw installation, no Capture SDK needed — just a
+VIDEO_DB_API_KEY in your .env file.
 
 Usage:
-    python rtstream_quickstart.py
+    uv run try_without_setup.py
 """
 
 import os
@@ -163,7 +164,7 @@ def interactive_search(screen_stream):
 
 
 async def main():
-    header("RTStream Quickstart")
+    header("OpenClaw Live Monitor")
 
     # --- Connect ---
     print(f"\n  {DIM}Connecting to VideoDB...{RESET}")
