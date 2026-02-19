@@ -48,9 +48,7 @@
 
 A real-time desktop capture SDK that lets your AI see and hear what's happening on a user's screen.
 
-**The problem:** Traditional screen recording creates video files. You can't query them, search them, or get insights until recording stops.
-
-**Our solution:** Stream screen, mic, and system audio to the cloud → run AI processing in real-time → receive structured events (transcripts, visual descriptions, semantic indexes) in under 2 seconds.
+VideoDB Capture gives AI agents eyes and ears—stream screen, mic, and system audio for real-time processing, delivering structured insights (transcripts, visual descriptions, semantic indexes) in under 2 seconds.
 
 **How it works:**
 - Your backend creates sessions and mints short-lived tokens (API key stays secure on server)
@@ -135,10 +133,14 @@ The SDK works in a 4-step flow:
 ```javascript
 import { connect } from 'videodb';
 const conn = connect();
+const ws = await conn.connectWebsocket();
+await ws.connect();
 
 const session = await conn.createCaptureSession({
   endUserId: "user_abc",
-  callbackUrl: "https://your-backend.com/webhooks/videodb"
+  callbackUrl: "https://your-backend.com/webhooks/videodb",
+  wsConnectionId: ws.connectionId,
+  metadata: { app: "my-app" }
 });
 
 const token = await conn.generateClientToken(600);
@@ -152,7 +154,9 @@ conn = videodb.connect()
 
 session = conn.create_capture_session(
     end_user_id="user_abc",
-    callback_url="https://your-backend.com/webhooks/videodb"
+    collection_id="default",
+    callback_url="https://your-backend.com/webhooks/videodb",
+    metadata={"app": "my-app"}
 )
 
 token = conn.generate_client_token(expires_in=600)
@@ -173,11 +177,23 @@ await client.requestPermission('microphone');
 await client.requestPermission('screen-capture');
 
 const channels = await client.listChannels();
-await client.startCaptureSession({
+const micChannel = channels.mics.default;
+const displayChannel = channels.displays.default;
+
+await client.startSession({
   sessionId: session.id,
   channels: [
-    channels.find(c => c.channelId === 'mic:default'),
-    channels.find(c => c.type === 'video')
+    {
+      channelId: micChannel.id,
+      type: 'audio',
+      record: true,
+      transcript: true
+    },
+    {
+      channelId: displayChannel.id,
+      type: 'video',
+      record: true
+    }
   ]
 });
 ```
@@ -193,11 +209,17 @@ async def main():
     await client.request_permission("microphone")
     await client.request_permission("screen_capture")
 
-    channels = await client.channels()
-    await client.start_capture_session(
+    channels = await client.list_channels()
+    mic = channels.mics.default
+    display = channels.displays.default
+
+    mic.store = True
+    display.store = True
+
+    await client.start_session(
         capture_session_id=session.id,
-        channels=[channels.mics.default, channels.displays.primary],
-        primary_video_channel_id=channels.displays.primary.name
+        channels=[mic, display],
+        primary_video_channel_id=display.id
     )
 
 asyncio.run(main())
@@ -231,12 +253,12 @@ if payload["event"] == "capture_session.active":
     cap = conn.get_capture_session(payload["capture_session_id"])
 
     # Start transcription on mic
-    if mics := cap.get_rtstream("mics"):
+    if mics := cap.get_rtstream("mic"):
         mics[0].start_transcript()
         mics[0].index_audio(prompt="Extract action items")
 
     # Start visual indexing on screen
-    if displays := cap.get_rtstream("displays"):
+    if displays := cap.get_rtstream("screen"):
         displays[0].index_visuals(prompt="Describe screen activity")
 ```
 
@@ -259,11 +281,11 @@ for await (const ev of ws.receive()) {
 
 #### Python
 ```python
-ws = conn.connect_websocket()
-await ws.connect()
+ws_wrapper = conn.connect_websocket()
+ws = await ws_wrapper.connect()
 
 # Receive live events
-async for ev in ws.stream():
+async for ev in ws.receive():
     if ev["channel"] == "transcript":
         print(f"Transcript: {ev['data']['text']}")
 ```

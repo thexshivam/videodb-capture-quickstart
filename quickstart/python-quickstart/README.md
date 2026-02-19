@@ -15,26 +15,12 @@ This app consists of two parts running locally:
 
 ## Setup
 
-1.  **Create and Activate Virtual Environment**:
+1.  **Install Dependencies**:
     ```bash
-    # Using uv (Recommended)
-    uv venv
-    source .venv/bin/activate
-
-    # OR using standard venv
-    python -m venv .venv
-    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    uv add -r requirements.txt
     ```
 
-2.  **Install Dependencies**:
-    ```bash
-    pip install -r requirements.txt
-
-    # OR using uv
-    uv pip install -r requirements.txt
-    ```
-
-3.  **Configure Environment**:
+2.  **Configure Environment**:
     Copy `.env.example` to `.env` and add your API key:
     ```bash
     cp .env.example .env

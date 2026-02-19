@@ -18,6 +18,12 @@
 
 ---
 
+## Demo
+
+https://github.com/user-attachments/assets/0fb87dfe-eb60-4e1e-9301-6ec01de80a25
+
+---
+
 ## Installation (Pre-built App)
 
 If you downloaded the pre-built app from the link above:

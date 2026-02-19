@@ -10,7 +10,9 @@
 
 ---
 
-![Sales Copilot](screenshot.png)
+## Demo
+
+https://github.com/user-attachments/assets/e3cd2dcc-d9ab-4f5f-8904-52c56133ed2d
 
 ## Download
 
