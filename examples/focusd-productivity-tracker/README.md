@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/icon.png" width="128" height="128" alt="Focusd icon" />
-</p>
-
 <h1 align="center">VideoDB Focusd</h1>
 
 <p align="center">
@@ -9,11 +5,13 @@
 </p>
 
 <p align="center">
-  <a href="https://artifacts.videodb.io/focusd-productivity-tracker/focusd-productivity-tracker-latest.dmg">Download for macOS</a>
+  <a href="https://github.com/video-db/focusd">
+    <img src="https://img.shields.io/badge/View%20Repository-Focusd-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
 </p>
 
 <p align="center">
-  <em>Currently available for macOS — Windows and Linux support coming soon</em>
+  🚀 Head over to the repository to explore the complete code and get started!
 </p>
 
 ---
@@ -21,6 +19,12 @@
 ## Demo
 
 https://github.com/user-attachments/assets/0fb87dfe-eb60-4e1e-9301-6ec01de80a25
+
+## Download
+
+- [Download for macOS](https://artifacts.videodb.io/focusd-productivity-tracker/focusd-productivity-tracker-latest.dmg)
+
+> **Platform Support**: macOS (Windows and Linux support coming soon)
 
 ---
 
@@ -209,3 +213,15 @@ To reset all data:
 ```
 rm -rf ~/Library/Application\ Support/VideoDB\ Focusd/
 ```
+
+## Community & Support
+
+- **Docs**: [docs.videodb.io](https://docs.videodb.io)
+- **Issues**: [GitHub Issues](https://github.com/video-db/focusd/issues)
+- **Discord**: [Join community](https://discord.gg/py9P639jGz)
+- **Console**: [Get API key](https://console.videodb.io)
+
+---
+
+<p align="center">Made with ❤️ by the <a href="https://videodb.io">VideoDB</a> team</p>
+

@@ -1,8 +1,24 @@
-# Async Recorder
+<h1 align="center">Async Recorder</h1>
 
-A Loom-style screen recording app built with Electron and the VideoDB Capture SDK.
+<p align="center">
+  A Loom-style screen recording app built with Electron and the VideoDB Capture SDK.
+</p>
 
-> **Platform Support**: macOS and Windows
+<p align="center">
+  <strong>Platform Support:</strong> macOS and Windows
+</p>
+
+<p align="center">
+  <a href="https://github.com/video-db/async-recorder">
+    <img src="https://img.shields.io/badge/View%20Repository-Async%20Recorder-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
+</p>
+
+<p align="center">
+  🚀 Head over to the repository to explore the complete code and get started!
+</p>
+
+---
 
 ## Features
 
@@ -16,11 +32,11 @@ A Loom-style screen recording app built with Electron and the VideoDB Capture SD
 
 | Main Window | Recording |
 |-------------|-----------|
-| ![Main](screenshots/main.png) | ![Recording](screenshots/recording.png) |
+| ![Main](../../assets/async-recorder-main.png) | ![Recording](../../assets/async-recorder-recording.png) |
 
 | Camera Bubble | History |
 |---------------|---------|
-| ![Camera](screenshots/camera.png) | ![History](screenshots/history.png) |
+| ![Camera](../../assets/async-recorder-camera.png) | ![History](../../assets/async-recorder-history.png) |
 
 ## Prerequisites
 
@@ -86,3 +102,15 @@ Then run `npm run setup && npm start`
 ## License
 
 MIT
+
+## Community & Support
+
+- **Docs**: [docs.videodb.io](https://docs.videodb.io)
+- **Issues**: [GitHub Issues](https://github.com/video-db/async-recorder/issues)
+- **Discord**: [Join community](https://discord.gg/py9P639jGz)
+- **Console**: [Get API key](https://console.videodb.io)
+
+---
+
+<p align="center">Made with ❤️ by the <a href="https://videodb.io">VideoDB</a> team</p>
+

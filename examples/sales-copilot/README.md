@@ -5,7 +5,13 @@
 </p>
 
 <p align="center">
-  <em>Currently available for macOS — Windows and Linux support coming soon</em>
+  <a href="https://github.com/video-db/sales-copilot">
+    <img src="https://img.shields.io/badge/View%20Repository-Sales%20Copilot-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
+</p>
+
+<p align="center">
+  🚀 Head over to the repository to explore the complete code and get started!
 </p>
 
 ---
@@ -18,6 +24,10 @@ https://github.com/user-attachments/assets/e3cd2dcc-d9ab-4f5f-8904-52c56133ed2d
 
 - **Apple Silicon**: [sales-copilot-1.0.0-arm64.dmg](https://artifacts.videodb.io/sales-copilot/sales-copilot-1.0.0-arm64.dmg)
 - **Apple Intel**: [sales-copilot-1.0.0.dmg](https://artifacts.videodb.io/sales-copilot/sales-copilot-1.0.0.dmg)
+
+<p>
+  <em>Currently available for macOS — Windows and Linux support coming soon</em>
+</p>
 
 ---
 
@@ -271,3 +281,15 @@ Application data is stored in:
 └── logs/
     └── app-YYYY-MM-DD.log  # Daily log files
 ```
+
+## Community & Support
+
+- **Docs**: [docs.videodb.io](https://docs.videodb.io)
+- **Issues**: [GitHub Issues](https://github.com/video-db/sales-copilot/issues)
+- **Discord**: [Join community](https://discord.gg/py9P639jGz)
+- **Console**: [Get API key](https://console.videodb.io)
+
+---
+
+<p align="center">Made with ❤️ by the <a href="https://videodb.io">VideoDB</a> team</p>
+

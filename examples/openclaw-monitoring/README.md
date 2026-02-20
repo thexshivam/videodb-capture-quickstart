@@ -1,8 +1,22 @@
-# OpenClaw Monitoring with VideoDB Capture
+<h1 align="center">OpenClaw Monitoring with VideoDB Capture</h1>
 
-This guide walks you through deploying a macOS EC2 instance on AWS, installing [OpenClaw](https://openclaw.ai) on it, and using [VideoDB Capture](https://videodb.io) to continuously monitor and record the agent's screen activity.
+<p align="center">
+  This guide walks you through deploying a macOS EC2 instance on AWS, installing <a href="https://openclaw.ai">OpenClaw</a> on it, and using <a href="https://videodb.io">VideoDB Capture</a> to continuously monitor and record the agent's screen activity.
+</p>
 
-> Windows and Linux guides coming soon.
+<p align="center">
+  <em>Windows and Linux guides coming soon.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/video-db/openclaw-monitoring">
+    <img src="https://img.shields.io/badge/View%20Repository-OpenClaw%20Monitoring-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
+</p>
+
+<p align="center">
+  🚀 Head over to the repository to explore the complete code and get started!
+</p>
 
 ---
 
@@ -346,4 +360,16 @@ async for msg in ws.receive():
     elif channel == "alert":
         print(f"Alert [{data.get('label')}]: confidence={data.get('confidence')} {data.get('text')}")
 ```
+
+
+## Community & Support
+
+- **Docs**: [docs.videodb.io](https://docs.videodb.io)
+- **Issues**: [GitHub Issues](https://github.com/video-db/openclaw-monitoring/issues)
+- **Discord**: [Join community](https://discord.gg/py9P639jGz)
+- **Console**: [Get API key](https://console.videodb.io)
+
+---
+
+<p align="center">Made with ❤️ by the <a href="https://videodb.io">VideoDB</a> team</p>
 
