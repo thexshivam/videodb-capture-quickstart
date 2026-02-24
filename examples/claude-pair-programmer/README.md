@@ -1,12 +1,24 @@
 <h1 align="center">Claude Pair Programmer</h1>
 
 <p align="center">
-  Official repository: <a href="https://github.com/video-db/claude-code/tree/main/plugins/pair-programmer">github.com/video-db/claude-code/plugins/pair-programmer</a>
+  Give Claude Code eyes and ears — perception for real-time screen vision, voice, and audio understanding.
 </p>
 
 <p align="center">
-  Give Claude Code eyes and ears — perception for real-time screen vision, voice, and audio understanding.
+  <a href="https://github.com/video-db/claude-code/tree/main/plugins/pair-programmer">
+    <img src="https://img.shields.io/badge/View%20Repository-Claude%20Pair%20Programmer-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
 </p>
+
+<p align="center">
+  🚀 Head over to the repository to explore the complete code and get started!
+</p>
+
+---
+
+## Demo
+
+https://github.com/user-attachments/assets/24f25eff-2af1-4048-9bbb-8d1d09559ebb
 
 ---
 
