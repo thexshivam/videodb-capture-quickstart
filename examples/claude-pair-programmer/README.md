@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/video-db/claude-code/tree/main/plugins/pair-programmer">
+  <a href="https://github.com/video-db/claude-code/tree/main">
     <img src="https://img.shields.io/badge/View%20Repository-Claude%20Pair%20Programmer-blue?style=for-the-badge&logo=github" alt="View Repository">
   </a>
 </p>
