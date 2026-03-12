@@ -1,5 +1,0 @@
-videodb
-flask
-pycloudflared
-python-dotenv
-requests
