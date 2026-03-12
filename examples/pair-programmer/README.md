@@ -28,6 +28,16 @@
   <a href="https://discord.gg/py9P639jGz">Join Discord</a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/video-db/pair-programmer">
+    <img src="https://img.shields.io/badge/View%20Repository-Pair%20Programmer-blue?style=for-the-badge&logo=github" alt="View Repository">
+  </a>
+</p>
+
+<p align="center">
+  🚀 Head over to the repository to explore the complete code and get started!
+</p>
+
 ---
 
 ## What is Pair Programmer?
